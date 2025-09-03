@@ -19,13 +19,22 @@
         background: #fff;
         z-index: 1;
       }
-      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Liberation Mono", monospace; }
+      .mono {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Liberation Mono", monospace;
+      }
 
-      /* ===== 進度地圖：左到右、每週一行 ===== */
-      .board-wrap { width: 100%; }
-      .board-grid { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+      /* ===== 進度地圖容器 ===== */
+      .board-wrap {
+        width: 100%;
+      }
+      .board-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        width: 100%;
+      }
 
-      /* 每行：左側週標籤 + 右側 7 格天數（右側用 flex 以利手機縮放寬度） */
+      /* 每行：左側週標籤 + 右側 7 格（右側用 flex，讓同一 row 自動等高） */
       .board-row {
         display: grid;
         grid-template-columns: 40px 1fr; /* 週標籤 + 天數區 */
@@ -36,6 +45,7 @@
         display: flex;
         gap: 8px;
         width: 100%;
+        align-items: stretch;
       }
 
       /* 垂直週數標籤（用 c1~c7 套色） */
@@ -43,76 +53,186 @@
         writing-mode: vertical-rl;
         text-orientation: mixed;
         display: flex;
-        align-items: center; justify-content: center;
+        align-items: center;
+        justify-content: center;
         border-radius: 10px;
         color: #fff;
         font-weight: 800;
         letter-spacing: 0.05em;
-        border: 1px solid rgba(0,0,0,.06);
+        border: 1px solid rgba(0, 0, 0, 0.06);
         padding: 4px 0;
         user-select: none;
       }
 
-      /* 天數方格（預設正方形；之後會由 JS 覆蓋高度，讓「每週同高且可增高」） */
+      /* 天數方格：高度由內容自然撐開（僅在整週全空時以 JS 設定固定高度） */
       .board-cell {
         position: relative;
-        aspect-ratio: 1 / 1;  /* 正方形，自適應寬度（JS 調高時會覆蓋） */
         border-radius: 12px;
         border: 1px solid #d5e8d5;
-        background: #edf7ee;  /* 淡綠底 */
-        overflow: hidden;
-        flex: 1 1 0;          /* 桌面 & 預設：等寬 */
+        background: #edf7ee;
+        flex: 1 1 0;
+        padding-top: 26px; /* 預留上方給 day-label */
+        overflow: visible;
       }
-      /* 手機：依有無姓名調整寬度比例（有名 3、無名 2 ⇒ 無名為 2/3） */
-      @media (max-width: 576px) {
-        .board-cell { flex: 3 1 0; }         /* 有姓名（預設） */
-        .board-cell.compact { flex: 2 1 0; }  /* 無姓名 ⇒ 2/3 寬 */
-      }
-
       .day-label {
-        position: absolute; top: 4px; left: 6px;
-        font-weight: 800; font-size: 0.9rem; color: #164e22;
-        text-shadow: 0 1px 0 rgba(255,255,255,.7);
+        position: absolute;
+        top: 4px;
+        left: 6px;
+        font-weight: 800;
+        font-size: 0.9rem;
+        color: #164e22;
+        text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
         pointer-events: none;
       }
 
-      /* 名字容器：避開上方天數，不遮擋 */
+      /* 姓名容器：走正常文流（參與高度計算） */
       .names-full {
-        position: absolute; left: 6px; right: 6px; top: 26px; bottom: 6px;
-        display: flex; flex-direction: column; justify-content: space-evenly;
-        gap: 2px; overflow: hidden;
+        position: static;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        gap: 4px;
       }
       .name-row {
-        width: 100%; text-align: center; font-weight: 800; line-height: 1.15;
-        color: #0f5132; background: rgba(255,255,255,.95);
-        border: 1px solid rgba(0,0,0,0.06); border-radius: 8px;
-        padding: 2px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-        /* 桌面：字級由 JS 自動計算；手機：固定最小字級並只顯示倒數兩字 */
+        width: 100%;
+        text-align: center;
+        font-weight: 800;
+        line-height: 1.2;
+        color: #0f5132;
+        background: rgba(255, 255, 255, 0.95);
+        border: 1px solid rgba(0, 0, 0, 0.06);
+        border-radius: 8px;
+        padding: 3px 6px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-size: 18px; /* ★ 電腦版固定 18px（手機會覆寫） */
       }
-      /* 手機極小化姓名顯示 */
+      /* ===== 手機（<=576px）規則 ===== */
       @media (max-width: 576px) {
-        .name-row { font-size: 10px !important; padding: 1px 4px; }
-        .day-label { font-size: 0.8rem; }
+        /* 手機板：每格至少 100px 高 */
+        .board-cell {
+          flex: 2 1 0; /* 你的原設定 */
+          min-height: 100px; /* ★ 新增：最小高度 100px */
+        }
+        .board-cell.col-wide {
+          flex: 3 1 0;
+        }
+        .board-cell.col-narrow {
+          flex: 1 1 0;
+        }
+
+        /* 手機板：姓名最小 12px（取代原本 10px） */
+        .name-row {
+          font-size: 12px !important; /* ★ 新增：最小字級 12px */
+          padding: 2px 4px;
+        }
+
+        .day-label {
+          font-size: 0.8rem;
+        }
       }
 
-      /* ===== 下方表格（沿用） ===== */
-      .badge-status { font-weight: 700; font-size: 0.95rem; padding: 0.5em 0.65em; line-height: 1; }
-      .status-dot   { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--bs-border-color,#dee2e6); vertical-align: middle; }
-      .badge-menu   { font-weight: 600; font-size: 0.9rem; padding: 0.45em 0.6em; line-height: 1; }
-      .table-center thead th, .table-center tbody td { text-align: center; vertical-align: middle; }
+      /* 若你先前已加過桌機最小 150px，這段可保留；若尚未加，建議一起加入 */
+      @media (min-width: 577px) {
+        .board-cell {
+          min-height: 150px;
+        } /* 桌機最小 150px */
+      }
 
-      .week-grid { display: inline-flex; gap: 0.3rem; justify-content: center; align-items: center; }
-      .week-box  { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: .5rem; font-weight: 800; font-size: .9rem; user-select: none; border: 1px solid var(--bs-border-color,#dee2e6); }
-      .week-box.inactive { background: var(--bs-light); color: var(--bs-secondary); }
+      /* ===== 下方表格 ===== */
+      .badge-status {
+        font-weight: 700;
+        font-size: 1rem;
+        padding: 0.5em 0.65em;
+        line-height: 1;
+      } /* 放大一點 */
+      .status-dot {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        border: 1px solid var(--bs-border-color, #dee2e6);
+        vertical-align: middle;
+      }
+      .badge-menu {
+        font-weight: 600;
+        font-size: 0.9rem;
+        padding: 0.45em 0.6em;
+        line-height: 1;
+      }
+      .table-center thead th,
+      .table-center tbody td {
+        text-align: center;
+        vertical-align: middle;
+      }
+
+      .week-grid {
+        display: inline-flex;
+        gap: 0.3rem;
+        justify-content: center;
+        align-items: center;
+      }
+      .week-box {
+        width: 28px;
+        height: 28px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 0.5rem;
+        font-weight: 800;
+        font-size: 0.9rem;
+        user-select: none;
+        border: 1px solid var(--bs-border-color, #dee2e6);
+      }
+      .week-box.inactive {
+        background: var(--bs-light);
+        color: var(--bs-secondary);
+      }
 
       /* 週色（表格與週標籤共用） */
-      .c1 { background:#ef4444;color:#fff;border-color:#ef4444;box-shadow:0 0 0 .12rem rgba(239,68,68,.15); }
-      .c2 { background:#f59e0b;color:#111;border-color:#f59e0b;box-shadow:0 0 0 .12rem rgba(245,158,11,.15); }
-      .c3 { background:#facc15;color:#111;border-color:#facc15;box-shadow:0 0 0 .12rem rgba(250,204,21,.2); }
-      .c4 { background:#22c55e;color:#fff;border-color:#22c55e;box-shadow:0 0 0 .12rem rgba(34,197,94,.18); }
-      .c5 { background:#3b82f6;color:#fff;border-color:#3b82f6;box-shadow:0 0 0 .12rem rgba(59,130,246,.18); }
-      .c6 { background:#6366f1;color:#fff;border-color:#6366f1;box-shadow:0 0 0 .12rem rgba(99,102,241,.18); }
-      .c7 { background:#a855f7;color:#fff;border-color:#a855f7;box-shadow:0 0 0 .12rem rgba(168,85,247,.18); }
+      .c1 {
+        background: #ef4444;
+        color: #fff;
+        border-color: #ef4444;
+        box-shadow: 0 0 0 0.12rem rgba(239, 68, 68, 0.15);
+      }
+      .c2 {
+        background: #f59e0b;
+        color: #111;
+        border-color: #f59e0b;
+        box-shadow: 0 0 0 0.12rem rgba(245, 158, 11, 0.15);
+      }
+      .c3 {
+        background: #facc15;
+        color: #111;
+        border-color: #facc15;
+        box-shadow: 0 0 0 0.12rem rgba(250, 204, 21, 0.2);
+      }
+      .c4 {
+        background: #22c55e;
+        color: #fff;
+        border-color: #22c55e;
+        box-shadow: 0 0 0 0.12rem rgba(34, 197, 94, 0.18);
+      }
+      .c5 {
+        background: #3b82f6;
+        color: #fff;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 0.12rem rgba(59, 130, 246, 0.18);
+      }
+      .c6 {
+        background: #6366f1;
+        color: #fff;
+        border-color: #6366f1;
+        box-shadow: 0 0 0 0.12rem rgba(99, 102, 241, 0.18);
+      }
+      .c7 {
+        background: #a855f7;
+        color: #fff;
+        border-color: #a855f7;
+        box-shadow: 0 0 0 0.12rem rgba(168, 85, 247, 0.18);
+      }
     </style>
   </head>
   <body>
@@ -139,7 +259,9 @@
       <!-- 表格 -->
       <div class="table-responsive px-3">
         <table id="dataTable" class="table table-striped table-hover align-middle table-fixed-header table-center mb-0">
-          <thead class="table-light"><tr id="theadRow"></tr></thead>
+          <thead class="table-light">
+            <tr id="theadRow"></tr>
+          </thead>
           <tbody id="tbody"></tbody>
         </table>
       </div>
@@ -151,37 +273,24 @@
       const SHEET_ID = "1vFrSu2c0UWTeyKdDcNwuwVUOSKHdRuTZ3PwzcoLyLEo";
       const SHEET_NAME = "健管學員清單";
 
-      const SOURCE_HEADERS = ["狀態","第幾天","學員姓名","專屬教練","開始日期","結束日期","今日菜單"];
-      const DISPLAY_HEADERS = ["狀態","學員姓名","天數","週數","專屬教練","執行日期","今日菜單"];
-      const MOBILE_KEEP = new Set(["狀態","學員姓名","天數","週數","專屬教練","今日菜單"]);
+      const SOURCE_HEADERS = ["狀態", "第幾天", "學員姓名", "專屬教練", "開始日期", "結束日期", "今日菜單"];
+      const DISPLAY_HEADERS = ["狀態", "學員姓名", "天數", "週數", "專屬教練", "執行日期", "今日菜單"];
+      const MOBILE_KEEP = new Set(["狀態", "學員姓名", "天數", "週數", "專屬教練", "今日菜單"]);
       const MAX_DAYS = 45;
 
-      // 地圖顯示哪些狀態（預設只顯示「進行中」）
-      const BOARD_STATUS_WHITELIST = ["進行中"];
+      // 地圖顯示哪些狀態（空陣列=全部；只要進行中→改成 ["進行中"]）
+      const BOARD_STATUS_WHITELIST = []; // ["進行中"]
 
       // ==== DOM ====
       const $loading = document.getElementById("loading");
-      const $error   = document.getElementById("error");
-      const $thead   = document.getElementById("theadRow");
-      const $tbody   = document.getElementById("tbody");
-      const $filter  = document.getElementById("filterInput");
-      const $reload  = document.getElementById("reloadBtn");
-      const $board   = document.getElementById("boardGrid");
+      const $error = document.getElementById("error");
+      const $thead = document.getElementById("theadRow");
+      const $tbody = document.getElementById("tbody");
+      const $filter = document.getElementById("filterInput");
+      const $reload = document.getElementById("reloadBtn");
+      const $board = document.getElementById("boardGrid");
 
       let _rawRows = []; // 關鍵字篩選基底
-      let $measure = null; // 桌面自動字級用
-
-      function getMeasureSpan() {
-        if ($measure) return $measure;
-        $measure = document.createElement("span");
-        $measure.style.position = "absolute";
-        $measure.style.left = "-9999px";
-        $measure.style.top = "-9999px";
-        $measure.style.whiteSpace = "nowrap";
-        $measure.style.fontWeight = "800";
-        document.body.appendChild($measure);
-        return $measure;
-      }
 
       // 初次載入
       buildBoard();
@@ -189,10 +298,19 @@
 
       // 綁定事件
       $reload.addEventListener("click", fetchAndRender);
-      $filter.addEventListener("input", applyFilter);
-      window.addEventListener("resize", debounce(handleResize, 100));
+      $filter.addEventListener("input", () => {
+        applyFilter();
+        afterLayout(handleResize);
+      });
+      window.addEventListener(
+        "resize",
+        debounce(() => afterLayout(handleResize), 100)
+      );
+      window.addEventListener("load", () => afterLayout(handleResize));
 
-      function isMobile() { return window.matchMedia("(max-width: 576px)").matches; }
+      function isMobile() {
+        return window.matchMedia("(max-width: 576px)").matches;
+      }
       function colClass(headerDisplay) {
         return MOBILE_KEEP.has(headerDisplay) ? "" : "d-none d-sm-table-cell";
       }
@@ -218,7 +336,8 @@
             const cell = document.createElement("div");
             cell.className = "board-cell";
             cell.id = `cell-day-${dayAbs}`;
-            cell.setAttribute("data-day", String(dayAbs));
+            cell.dataset.day = String(dayAbs);
+            cell.dataset.col = String(c); // 直欄索引 1..7
             cell.innerHTML = `
               <div class="day-label">${dayAbs}</div>
               <div class="names-full"></div>
@@ -231,9 +350,10 @@
       }
 
       async function fetchAndRender() {
-        toggleLoading(true); clearError();
+        toggleLoading(true);
+        clearError();
         $tbody.innerHTML = "";
-        $thead.innerHTML = DISPLAY_HEADERS.map(h => `<th scope="col" class="${colClass(h)}">${h}</th>`).join("");
+        $thead.innerHTML = DISPLAY_HEADERS.map((h) => `<th scope="col" class="${colClass(h)}">${h}</th>`).join("");
 
         try {
           const rangeA1 = `${SHEET_NAME}!A:Z`;
@@ -243,37 +363,40 @@
           const data = await resp.json();
 
           const values = data.values || [];
-          if (!values.length) { showError("工作表沒有資料。"); toggleLoading(false); return; }
+          if (!values.length) {
+            showError("工作表沒有資料。");
+            toggleLoading(false);
+            return;
+          }
 
-          const headerRow = values[0].map(v => (v ?? "").trim());
-          const bodyRows  = values.slice(1);
+          const headerRow = values[0].map((v) => (v ?? "").trim());
+          const bodyRows = values.slice(1);
 
           const colIndexByLabel = {};
-          headerRow.forEach((label, idx) => { if (label) colIndexByLabel[label] = idx; });
+          headerRow.forEach((label, idx) => {
+            if (label) colIndexByLabel[label] = idx;
+          });
 
-          const missing = SOURCE_HEADERS.filter(h => !(h in colIndexByLabel));
+          const missing = SOURCE_HEADERS.filter((h) => !(h in colIndexByLabel));
           if (missing.length) showError(`下列表頭在工作表中找不到：${missing.join("、")}。請確認表頭文字一致。`);
 
-          const nameIdx  = colIndexByLabel["學員姓名"];
-          const dayIdx   = colIndexByLabel["第幾天"];
+          const nameIdx = colIndexByLabel["學員姓名"];
+          const dayIdx = colIndexByLabel["第幾天"];
           const startIdx = colIndexByLabel["開始日期"];
-          const endIdx   = colIndexByLabel["結束日期"];
+          const endIdx = colIndexByLabel["結束日期"];
 
           const records = [];
           for (const row of bodyRows) {
-            if (!row || row.every(cell => String(cell || "").trim() === "")) continue;
-
+            if (!row || row.every((cell) => String(cell || "").trim() === "")) continue;
             const nameVal = Number.isInteger(nameIdx) ? String(row[nameIdx] ?? "").trim() : "";
             if (!nameVal) continue;
 
-            const statusTxt   = getCell(row, colIndexByLabel["狀態"]);
+            const statusTxt = getCell(row, colIndexByLabel["狀態"]);
             const isCompleted = /已完成/i.test(statusTxt);
-            const isInProgress= /進行中/i.test(statusTxt);
-
             const startRaw = getCell(row, startIdx);
             const startDate = parseSheetDate(startRaw);
 
-            records.push({ row, statusTxt, isCompleted, isInProgress, startDate });
+            records.push({ row, statusTxt, isCompleted, startDate });
           }
 
           // 排序：已完成放最後；其餘依開始日期由早到晚
@@ -289,7 +412,8 @@
           _rawRows = [];
           for (const rec of records) {
             const { row, statusTxt, isCompleted } = rec;
-            const tds = []; const rowTextCollector = [];
+            const tds = [];
+            const rowTextCollector = [];
 
             for (const headerDisplay of DISPLAY_HEADERS) {
               if (headerDisplay === "週數") {
@@ -304,14 +428,16 @@
 
               if (headerDisplay === "執行日期") {
                 const startTxtRaw = getCell(row, startIdx);
-                const endTxtRaw   = getCell(row, endIdx);
-                const startDisp   = formatDateDisplay(startTxtRaw);
-                const endDisp     = formatDateDisplay(endTxtRaw);
-                const cellHtml = (startDisp || endDisp)
-                  ? `<div class="d-flex flex-column align-items-center">
+                const endTxtRaw = getCell(row, endIdx);
+                const startDisp = formatDateDisplay(startTxtRaw);
+                const endDisp = formatDateDisplay(endTxtRaw);
+                const cellHtml =
+                  startDisp || endDisp
+                    ? `<div class="d-flex flex-column align-items-center">
                        <span class="fw-semibold">${escapeHtml(startDisp)}</span>
                        <span class="text-secondary small">${escapeHtml(endDisp)}</span>
-                     </div>` : "";
+                     </div>`
+                    : "";
                 tds.push(`<td class="${colClass(headerDisplay)}">${cellHtml}</td>`);
                 rowTextCollector.push(`${startDisp} ${endDisp}`);
                 continue;
@@ -326,12 +452,19 @@
               if (sourceHeader === "狀態") {
                 const s = (statusTxt || txt || "").trim();
                 let badgeCls = "bg-secondary text-white";
-                let dotBg    = "bg-secondary";
-                if (/已完成/i.test(s)) { badgeCls = "bg-primary text-white"; dotBg = "bg-primary"; }
-                else if (/未開始/i.test(s)) { badgeCls = "bg-light text-dark border"; dotBg = "bg-light"; }
-                else if (/進行中/i.test(s)) { badgeCls = "bg-success text-white"; dotBg = "bg-success"; }
+                let dotBg = "bg-secondary";
+                if (/已完成/i.test(s)) {
+                  badgeCls = "bg-primary text-white";
+                  dotBg = "bg-primary";
+                } else if (/未開始/i.test(s)) {
+                  badgeCls = "bg-light text-dark border";
+                  dotBg = "bg-light";
+                } else if (/進行中/i.test(s)) {
+                  badgeCls = "bg-success text-white";
+                  dotBg = "bg-success";
+                }
                 const desktop = `<span class="badge ${badgeCls} badge-status d-none d-sm-inline-block">${escapeHtml(s)}</span>`;
-                const mobile  = `<span class="status-dot ${dotBg} d-inline-block d-sm-none" title="${escapeHtml(s)}" aria-label="${escapeHtml(s)}"></span>`;
+                const mobile = `<span class="status-dot ${dotBg} d-inline-block d-sm-none" title="${escapeHtml(s)}" aria-label="${escapeHtml(s)}"></span>`;
                 tds.push(`<td class="${colClass(headerDisplay)}">${desktop}${mobile}</td>`);
               } else if (sourceHeader === "今日菜單" && txt) {
                 const s = txt.replace(/\s/g, "");
@@ -357,8 +490,8 @@
           // 地圖渲染：把名字放到對應天數（支援 /／\＼ 分割多名）
           renderBoardNames(records, colIndexByLabel);
 
-          // 桌面自動字級 / 手機極小名 + 無名格縮 2/3 + 依人數增高每週行高
-          handleResize();
+          // 完成 DOM 後：做手機姓名/欄寬調整，再設置「全空週的固定高度」
+          afterLayout(handleResize);
         } catch (err) {
           showError("讀取失敗：" + (err?.message || err));
         } finally {
@@ -368,25 +501,25 @@
 
       // 把學員名字放到對應格子
       function renderBoardNames(records, colIndexByLabel) {
-        // 清空
-        document.querySelectorAll(".board-cell .names-full").forEach(el => el.innerHTML = "");
-        document.querySelectorAll(".board-cell").forEach(cell => cell.classList.remove("compact"));
+        document.querySelectorAll(".board-cell .names-full").forEach((el) => (el.innerHTML = ""));
 
-        const nameIdx   = colIndexByLabel["學員姓名"];
-        const dayIdx    = colIndexByLabel["第幾天"];
+        const nameIdx = colIndexByLabel["學員姓名"];
+        const dayIdx = colIndexByLabel["第幾天"];
         const statusIdx = colIndexByLabel["狀態"];
-
         const SPLIT_RE = /[\/／﹨＼]/;
 
         const dayMap = new Map(); // day -> names[]
         for (const rec of records) {
           const status = getCell(rec.row, statusIdx);
-          const keep = BOARD_STATUS_WHITELIST.length === 0 || BOARD_STATUS_WHITELIST.some(s => status.includes(s));
+          const keep = BOARD_STATUS_WHITELIST.length === 0 || BOARD_STATUS_WHITELIST.some((s) => status.includes(s));
           if (!keep) continue;
 
           const raw = getCell(rec.row, nameIdx);
-          const parts = raw.split(SPLIT_RE).map(s => s.trim()).filter(Boolean);
-          const nDay  = Number(getCell(rec.row, dayIdx));
+          const parts = raw
+            .split(SPLIT_RE)
+            .map((s) => s.trim())
+            .filter(Boolean);
+          const nDay = Number(getCell(rec.row, dayIdx));
           if (!Number.isFinite(nDay) || nDay <= 0 || nDay > MAX_DAYS) continue;
 
           if (!dayMap.has(nDay)) dayMap.set(nDay, []);
@@ -399,132 +532,122 @@
           if (!cell) continue;
 
           const wrap = cell.querySelector(".names-full");
-          names.forEach(name => {
-            const row = document.createElement("div");
-            row.className = "name-row";
-            row.dataset.fullname = name;        // 保留完整姓名
-            row.textContent = name;             // 初始先放全名，之後視裝置再裁切
-            row.title = name;
-            wrap.appendChild(row);
-          });
+          for (const name of names) {
+            const r = document.createElement("div");
+            r.className = "name-row";
+            r.dataset.fullname = name; // 保留全名
+            r.textContent = name; // 初始全名（手機稍後裁成倒數兩字）
+            r.title = name;
+            wrap.appendChild(r);
+          }
         }
       }
 
-      // 手機：姓名改顯示倒數兩字；並標記「無名格」為 compact（2/3 寬）
+      /* === 手機：姓名倒數兩字 + 依直欄統一寬度 === */
       function applyMobileNameTransform() {
         const isM = isMobile();
-        const cells = document.querySelectorAll(".board-cell");
 
-        cells.forEach(cell => {
-          const wrap = cell.querySelector(".names-full");
-          const rows = Array.from(wrap.querySelectorAll(".name-row"));
-
-          if (isM) {
-            // 倒數兩字顯示
-            rows.forEach(r => {
-              const full = r.dataset.fullname || r.textContent || "";
-              r.textContent = lastTwo(full);
-            });
-            // 無名格 → compact (2/3 寬)
-            if (rows.length === 0) cell.classList.add("compact");
-            else cell.classList.remove("compact");
-          } else {
-            // 還原全名；桌面不縮寬
-            rows.forEach(r => { r.textContent = r.dataset.fullname || r.textContent; r.style.fontSize = ""; });
-            cell.classList.remove("compact");
-          }
+        // 還原全名（避免反覆切換造成裁切累積）
+        document.querySelectorAll(".name-row").forEach((r) => {
+          if (r.dataset.fullname) r.textContent = r.dataset.fullname;
         });
-      }
-
-      // 桌面：自動把姓名字級撐滿可用高度/寬度；手機：固定極小字級（CSS 已處理）
-      function autosizeAllCells() {
-        if (isMobile()) return; // 手機固定 10px，且只顯示兩字
-        const cells = document.querySelectorAll(".board-cell");
-        cells.forEach(cell => autosizeCell(cell));
-      }
-
-      function autosizeCell(cell) {
-        const wrap = cell.querySelector(".names-full");
-        const rows = Array.from(wrap.querySelectorAll(".name-row"));
-        if (!rows.length) return;
-
-        const measure = getMeasureSpan();
-        const maxWidth = wrap.clientWidth;
-        const maxHeight = wrap.clientHeight;
-        if (maxWidth <= 0 || maxHeight <= 0) return;
-
-        let candidate = Math.floor((maxHeight / rows.length) * 0.9);
-        candidate = Math.max(10, candidate);
-
-        let finalSize = candidate;
-        rows.forEach(r => {
-          measure.style.fontSize = candidate + "px";
-          measure.style.fontFamily = getComputedStyle(r).fontFamily;
-          measure.style.fontWeight = "800";
-          measure.textContent = r.textContent || "";
-          const w = measure.getBoundingClientRect().width;
-          if (w > maxWidth) {
-            const scale = (maxWidth / w) * 0.98;
-            finalSize = Math.min(finalSize, Math.max(10, Math.floor(candidate * scale)));
-          }
+        // 清除欄寬分類
+        document.querySelectorAll(".board-cell").forEach((cell) => {
+          cell.classList.remove("col-wide", "col-narrow");
+          cell.style.height = ""; // 清除可能的「全空週固定高度」
+          cell.style.minHeight = "";
         });
 
-        rows.forEach(r => { r.style.fontSize = finalSize + "px"; });
+        if (!isM) return;
 
-        const totalHeight = rows.reduce((sum, r) => sum + r.getBoundingClientRect().height + 2, 0);
-        if (totalHeight > maxHeight) {
-          const scale = Math.max(0.6, (maxHeight / totalHeight) * 0.98);
-          const size = Math.max(10, Math.floor(finalSize * scale));
-          rows.forEach(r => r.style.fontSize = size + "px");
+        // 手機：姓名 → 倒數兩字
+        document.querySelectorAll(".name-row").forEach((r) => {
+          const full = r.dataset.fullname || r.textContent || "";
+          r.textContent = lastTwo(full);
+        });
+
+        // 依直欄（1..7）判斷是否有姓名
+        for (let c = 1; c <= 7; c++) {
+          const cells = Array.from(document.querySelectorAll(`.board-cell[data-col="${c}"]`));
+          const hasNameInColumn = cells.some((cell) => cell.querySelector(".name-row"));
+          const cls = hasNameInColumn ? "col-wide" : "col-narrow";
+          cells.forEach((cell) => cell.classList.add(cls));
         }
       }
 
-      // ★ 依每週人數動態調整每週行高（使該週 7 格同高，且不小於正方形原始高度）
-      function adjustWeekHeights() {
-        const rows = Array.from(document.querySelectorAll('#boardGrid .board-row'));
+      // ★ 只有整週沒有姓名時，才把該 row 的 7 格設為「與週標籤同高」
+      function adjustWeekMinHeights() {
+        const rows = Array.from(document.querySelectorAll("#boardGrid .board-row"));
+        const mobile = isMobile();
+
         rows.forEach((row) => {
-          const cells = Array.from(row.querySelectorAll('.board-cell'));
+          const tag = row.querySelector(".week-tag");
+          const cells = Array.from(row.querySelectorAll(".board-cell"));
           if (!cells.length) return;
 
-          // 回復到自然（正方形）以便重算
-          cells.forEach(cell => {
-            cell.style.height = '';
-            cell.style.aspectRatio = ''; // 先移除 inline，回到 CSS 的 1/1
+          // 先清掉舊的 inline 限制
+          cells.forEach((cell) => {
+            cell.style.height = "";
+            cell.style.minHeight = "";
           });
 
-          let weekHeight = 0;
-          cells.forEach(cell => {
-            const cellWidth = cell.getBoundingClientRect().width; // 正方形的基準高度
-            const namesWrap = cell.querySelector('.names-full');
-            const neededByNames = 26 + (namesWrap ? namesWrap.scrollHeight : 0) + 6 + 2; // 頂部 26 + 底 6 + 餘裕 2
-            const need = Math.max(cellWidth, neededByNames);
-            weekHeight = Math.max(weekHeight, need);
-          });
+          // 判斷這週是否完全沒有姓名
+          const hasAnyName = cells.some((cell) => cell.querySelector(".name-row"));
+          if (!hasAnyName) {
+            // 量週標籤高度（以一致的三字「週數」量測）
+            let tagH = 0;
+            if (tag) {
+              const original = tag.textContent;
+              tag.textContent = "週數";
+              tagH = Math.ceil(tag.getBoundingClientRect().height);
+              tag.textContent = original;
+            }
+            if (!tagH || tagH < 40) tagH = 40; // 後備值
 
-          // 套用到該週 7 格：統一高度並蓋掉 aspect-ratio
-          cells.forEach(cell => {
-            cell.style.aspectRatio = 'auto';
-            cell.style.height = `${Math.ceil(weekHeight)}px`;
-          });
+            const floor = mobile ? 100 : 150; // ★ 手機 100、桌機 150
+            const minH = Math.max(tagH, floor);
+
+            // 用 minHeight（不是 height）→ 不會蓋掉 CSS 的更高需求
+            cells.forEach((cell) => {
+              cell.style.minHeight = `${minH}px`;
+            });
+          }
+          // 有姓名的週：不設 inline 高度，讓內容自然撐高，
+          // 同時交給 CSS 的 min-height 100/150 做底線。
         });
       }
 
+      // 計算順序：手機姓名/欄寬 → 若整週全空則設定固定高度
       function handleResize() {
         applyMobileNameTransform();
-        autosizeAllCells();
-        adjustWeekHeights(); // ★ 新增：依每週人數調整行高
+        adjustWeekMinHeights();
+      }
+
+      // 兩次 rAF 之後再執行，確保 DOM/樣式都完成佈局
+      function afterLayout(fn) {
+        requestAnimationFrame(() => requestAnimationFrame(fn));
       }
 
       // 工具：防抖
       function debounce(fn, wait) {
-        let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn.apply(null, args), wait); };
+        let t;
+        return (...args) => {
+          clearTimeout(t);
+          t = setTimeout(() => fn.apply(null, args), wait);
+        };
       }
 
       function applyFilter() {
         const q = ($filter.value || "").trim().toLowerCase();
         const trs = $tbody.querySelectorAll("tr");
-        if (!q) { trs.forEach(tr => tr.classList.remove("d-none")); return; }
-        trs.forEach((tr, i) => { const hit = _rawRows[i]?.includes(q); tr.classList.toggle("d-none", !hit); });
+        if (!q) {
+          trs.forEach((tr) => tr.classList.remove("d-none"));
+          return;
+        }
+        trs.forEach((tr, i) => {
+          const hit = _rawRows[i]?.includes(q);
+          tr.classList.toggle("d-none", !hit);
+        });
       }
 
       // === 小工具 ===
@@ -532,8 +655,12 @@
         const arr = Array.from(String(str).trim());
         return arr.length <= 2 ? arr.join("") : arr.slice(-2).join("");
       }
-      function numToZh(n) { return ["一","二","三","四","五","六","七"][n-1] || String(n); }
-      function getCell(row, idx) { return Number.isInteger(idx) && row[idx] != null ? String(row[idx]).trim() : ""; }
+      function numToZh(n) {
+        return ["一", "二", "三", "四", "五", "六", "七"][n - 1] || String(n);
+      }
+      function getCell(row, idx) {
+        return Number.isInteger(idx) && row[idx] != null ? String(row[idx]).trim() : "";
+      }
 
       // 週數渲染（彩虹進度）
       function renderWeekGridResponsive(weekNum) {
@@ -556,7 +683,9 @@
       function formatDateDisplay(val) {
         const d = parseSheetDate(val);
         if (!d) return String(val || "").trim();
-        const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,"0"), dd = String(d.getDate()).padStart(2,"0");
+        const y = d.getFullYear(),
+          m = String(d.getMonth() + 1).padStart(2, "0"),
+          dd = String(d.getDate()).padStart(2, "0");
         return `${y}/${m}/${dd}`;
       }
 
@@ -569,24 +698,39 @@
           const n = Number(s);
           if (Number.isFinite(n) && n > 30000 && n < 70000) return serialToDate(n);
         }
-        const norm = s.replace(/\./g,"-").replace(/\//g,"-");
+        const norm = s.replace(/\./g, "-").replace(/\//g, "-");
         const parts = norm.split("-");
         if (parts.length === 3) {
-          const [a,b,c] = parts;
-          if (a.length === 4) { const d = new Date(Number(a), Number(b)-1, Number(c)); if (!isNaN(d)) return d; }
-          else if (c.length === 4) { const d = new Date(Number(c), Number(a)-1, Number(b)); if (!isNaN(d)) return d; }
+          const [a, b, c] = parts;
+          if (a.length === 4) {
+            const d = new Date(Number(a), Number(b) - 1, Number(c));
+            if (!isNaN(d)) return d;
+          } else if (c.length === 4) {
+            const d = new Date(Number(c), Number(a) - 1, Number(b));
+            if (!isNaN(d)) return d;
+          }
         }
         const d = new Date(s);
         return isNaN(d) ? null : d;
       }
-      function serialToDate(n) { const epoch = Date.UTC(1899,11,30); return new Date(epoch + n*86400*1000); }
-      function escapeHtml(str) {
-        return String(str).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
-                         .replaceAll('"',"&quot;").replaceAll("'","&#039;");
+      function serialToDate(n) {
+        const epoch = Date.UTC(1899, 11, 30);
+        return new Date(epoch + n * 86400 * 1000);
       }
-      function toggleLoading(show) { $loading.classList.toggle("d-none", !show); }
-      function showError(msg) { $error.textContent = msg; $error.classList.remove("d-none"); }
-      function clearError() { $error.textContent = ""; $error.classList.add("d-none"); }
+      function escapeHtml(str) {
+        return String(str).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
+      }
+      function toggleLoading(show) {
+        $loading.classList.toggle("d-none", !show);
+      }
+      function showError(msg) {
+        $error.textContent = msg;
+        $error.classList.remove("d-none");
+      }
+      function clearError() {
+        $error.textContent = "";
+        $error.classList.add("d-none");
+      }
     </script>
   </body>
 </html>
