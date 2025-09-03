@@ -487,34 +487,39 @@
       }
 
       // 依每週內容動態調整行高（同週同高；不小於正方形基準）
-      function adjustWeekHeights() {
-        const rows = Array.from(document.querySelectorAll('#boardGrid .board-row'));
-        rows.forEach((row) => {
-          const cells = Array.from(row.querySelectorAll('.board-cell'));
-          if (!cells.length) return;
+      // ★ 每週高度只依「名字內容需要的高度」決定（手機/桌面皆適用）
+function adjustWeekHeights() {
+  const rows = Array.from(document.querySelectorAll('#boardGrid .board-row'));
+  rows.forEach((row) => {
+    const cells = Array.from(row.querySelectorAll('.board-cell'));
+    if (!cells.length) return;
 
-          // 回復自然值以便重算
-          cells.forEach(cell => {
-            cell.style.height = '';
-            cell.style.aspectRatio = '';
-          });
+    // 回復自然值以便重算
+    cells.forEach(cell => {
+      cell.style.height = '';
+      cell.style.aspectRatio = ''; // 解除 1:1，以便改成依內容高度
+    });
 
-          let weekHeight = 0;
-          cells.forEach(cell => {
-            const cellWidth = cell.getBoundingClientRect().width; // 正方形基準
-            const namesWrap = cell.querySelector('.names-full');
-            const neededByNames = 26 + (namesWrap ? namesWrap.scrollHeight : 0) + 6 + 2; // 頂 26 + 底 6 + 餘裕 2
-            const need = Math.max(cellWidth, neededByNames);
-            weekHeight = Math.max(weekHeight, need);
-          });
+    let weekHeight = 0;
+    cells.forEach(cell => {
+      const namesWrap = cell.querySelector('.names-full');
+      const namesH = namesWrap ? namesWrap.scrollHeight : 0;
 
-          // 套用統一高度
-          cells.forEach(cell => {
-            cell.style.aspectRatio = 'auto';
-            cell.style.height = `${Math.ceil(weekHeight)}px`;
-          });
-        });
-      }
+      // 26：上方天數標籤預留；6：下方預留；可依你的樣式微調
+      const need = 26 + namesH + 6;
+      weekHeight = Math.max(weekHeight, need);
+    });
+
+    // 沒有名字時避免太扁，給個很小的下限（可改）
+    weekHeight = Math.max(weekHeight, 42);
+
+    // 套用到該週 7 格：同高
+    cells.forEach(cell => {
+      cell.style.aspectRatio = 'auto';
+      cell.style.height = `${Math.ceil(weekHeight)}px`;
+    });
+  });
+}
 
       function handleResize() {
         applyMobileNameTransform(); // 手機倒數兩字 + 欄寬分類
@@ -597,3 +602,4 @@
     </script>
   </body>
 </html>
+
