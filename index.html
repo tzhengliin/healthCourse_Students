@@ -25,7 +25,7 @@
       .board-wrap { width: 100%; }
       .board-grid { display: flex; flex-direction: column; gap: 10px; width: 100%; }
 
-      /* 每行：左側週標籤 + 右側 7 格天數（右側用 flex 以利手機縮放寬度） */
+      /* 每行：左側週標籤 + 右側 7 格天數（右側改為 7 欄等寬 grid，確保同直排寬度統一） */
       .board-row {
         display: grid;
         grid-template-columns: 40px 1fr; /* 週標籤 + 天數區 */
@@ -33,7 +33,8 @@
         width: 100%;
       }
       .days-row {
-        display: flex;
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr)); /* ★ 7 欄等寬，所有週的同一欄寬度一致 */
         gap: 8px;
         width: 100%;
       }
@@ -53,7 +54,7 @@
         user-select: none;
       }
 
-      /* 天數方格（預設正方形；之後會由 JS 覆蓋高度，讓「每週同高且可增高」） */
+      /* 天數方格（預設正方形；之後由 JS 覆蓋高度，讓「每週同高且可增高」） */
       .board-cell {
         position: relative;
         aspect-ratio: 1 / 1;  /* 正方形，自適應寬度（JS 調高時會覆蓋） */
@@ -61,12 +62,6 @@
         border: 1px solid #d5e8d5;
         background: #edf7ee;  /* 淡綠底 */
         overflow: hidden;
-        flex: 1 1 0;          /* 桌面 & 預設：等寬 */
-      }
-      /* 手機：依有無姓名調整寬度比例（有名 3、無名 2 ⇒ 無名為 2/3） */
-      @media (max-width: 576px) {
-        .board-cell { flex: 3 1 0; }         /* 有姓名（預設） */
-        .board-cell.compact { flex: 2 1 0; }  /* 無姓名 ⇒ 2/3 寬 */
       }
 
       .day-label {
@@ -79,19 +74,28 @@
       /* 名字容器：避開上方天數，不遮擋 */
       .names-full {
         position: absolute; left: 6px; right: 6px; top: 26px; bottom: 6px;
-        display: flex; flex-direction: column; justify-content: space-evenly;
-        gap: 2px; overflow: hidden;
+        display: flex; flex-direction: column; justify-content: flex-start;
+        gap: 4px; overflow: visible; /* ★ 讓高度可被量測並由 JS 拉高格子，不裁切 */
       }
       .name-row {
-        width: 100%; text-align: center; font-weight: 800; line-height: 1.15;
+        width: 100%; text-align: center; font-weight: 800; line-height: 1.2;
         color: #0f5132; background: rgba(255,255,255,.95);
         border: 1px solid rgba(0,0,0,0.06); border-radius: 8px;
-        padding: 2px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-        /* 桌面：字級由 JS 自動計算；手機：固定最小字級並只顯示倒數兩字 */
+        padding: 3px 6px;
+        /* 桌面：字級由 JS 自動計算以避免溢出；手機：正常顯示（可換行） */
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       }
-      /* 手機極小化姓名顯示 */
+      /* 手機：姓名要「正常顯示、不裁切」，允許換行且不省略；高度由 JS 自動增高 */
       @media (max-width: 576px) {
-        .name-row { font-size: 10px !important; padding: 1px 4px; }
+        .name-row {
+          white-space: normal;         /* ★ 允許換行 */
+          overflow: visible;           /* ★ 不裁切 */
+          text-overflow: clip;         /* ★ 不顯示省略號 */
+          word-break: break-all;       /* ★ 中文/英文均可換行 */
+          font-size: 12px !important;  /* 可自行調整基準字級 */
+          line-height: 1.25;
+          padding: 4px 6px;
+        }
         .day-label { font-size: 0.8rem; }
       }
 
@@ -210,7 +214,7 @@
           tag.textContent = `第${numToZh(w)}週`;
           row.appendChild(tag);
 
-          // 7 天容器（flex）
+          // 7 天容器（grid 7 欄）
           const days = document.createElement("div");
           days.className = "days-row";
           for (let c = 1; c <= 7; c++) {
@@ -357,7 +361,7 @@
           // 地圖渲染：把名字放到對應天數（支援 /／\＼ 分割多名）
           renderBoardNames(records, colIndexByLabel);
 
-          // 桌面自動字級 / 手機極小名 + 無名格縮 2/3 + 依人數增高每週行高
+          // 自動高度調整（桌面 & 手機）
           handleResize();
         } catch (err) {
           showError("讀取失敗：" + (err?.message || err));
@@ -370,7 +374,6 @@
       function renderBoardNames(records, colIndexByLabel) {
         // 清空
         document.querySelectorAll(".board-cell .names-full").forEach(el => el.innerHTML = "");
-        document.querySelectorAll(".board-cell").forEach(cell => cell.classList.remove("compact"));
 
         const nameIdx   = colIndexByLabel["學員姓名"];
         const dayIdx    = colIndexByLabel["第幾天"];
@@ -402,43 +405,17 @@
           names.forEach(name => {
             const row = document.createElement("div");
             row.className = "name-row";
-            row.dataset.fullname = name;        // 保留完整姓名
-            row.textContent = name;             // 初始先放全名，之後視裝置再裁切
+            row.dataset.fullname = name;        // 保留完整姓名（目前手機也用全名）
+            row.textContent = name;             // 顯示全名
             row.title = name;
             wrap.appendChild(row);
           });
         }
       }
 
-      // 手機：姓名改顯示倒數兩字；並標記「無名格」為 compact（2/3 寬）
-      function applyMobileNameTransform() {
-        const isM = isMobile();
-        const cells = document.querySelectorAll(".board-cell");
-
-        cells.forEach(cell => {
-          const wrap = cell.querySelector(".names-full");
-          const rows = Array.from(wrap.querySelectorAll(".name-row"));
-
-          if (isM) {
-            // 倒數兩字顯示
-            rows.forEach(r => {
-              const full = r.dataset.fullname || r.textContent || "";
-              r.textContent = lastTwo(full);
-            });
-            // 無名格 → compact (2/3 寬)
-            if (rows.length === 0) cell.classList.add("compact");
-            else cell.classList.remove("compact");
-          } else {
-            // 還原全名；桌面不縮寬
-            rows.forEach(r => { r.textContent = r.dataset.fullname || r.textContent; r.style.fontSize = ""; });
-            cell.classList.remove("compact");
-          }
-        });
-      }
-
-      // 桌面：自動把姓名字級撐滿可用高度/寬度；手機：固定極小字級（CSS 已處理）
+      // 桌面：自動把姓名字級撐滿可用高度/寬度；手機：交由高度增高，不縮字
       function autosizeAllCells() {
-        if (isMobile()) return; // 手機固定 10px，且只顯示兩字
+        if (isMobile()) return; // 手機不自動縮字，依高度增高確保完整顯示
         const cells = document.querySelectorAll(".board-cell");
         cells.forEach(cell => autosizeCell(cell));
       }
@@ -471,7 +448,7 @@
 
         rows.forEach(r => { r.style.fontSize = finalSize + "px"; });
 
-        const totalHeight = rows.reduce((sum, r) => sum + r.getBoundingClientRect().height + 2, 0);
+        const totalHeight = rows.reduce((sum, r) => sum + r.getBoundingClientRect().height + 4, 0); // gap=4
         if (totalHeight > maxHeight) {
           const scale = Math.max(0.6, (maxHeight / totalHeight) * 0.98);
           const size = Math.max(10, Math.floor(finalSize * scale));
@@ -479,7 +456,7 @@
         }
       }
 
-      // ★ 依每週人數動態調整每週行高（使該週 7 格同高，且不小於正方形原始高度）
+      // ★ 依每週「實際需要高度」動態調整每週行高（使該週 7 格同高，且不小於正方形原始高度）
       function adjustWeekHeights() {
         const rows = Array.from(document.querySelectorAll('#boardGrid .board-row'));
         rows.forEach((row) => {
@@ -496,12 +473,12 @@
           cells.forEach(cell => {
             const cellWidth = cell.getBoundingClientRect().width; // 正方形的基準高度
             const namesWrap = cell.querySelector('.names-full');
-            const neededByNames = 26 + (namesWrap ? namesWrap.scrollHeight : 0) + 6 + 2; // 頂部 26 + 底 6 + 餘裕 2
+            const neededByNames = 26 + (namesWrap ? namesWrap.scrollHeight : 0) + 6 + 2; // 頂 26 + 底 6 + 餘裕 2
             const need = Math.max(cellWidth, neededByNames);
             weekHeight = Math.max(weekHeight, need);
           });
 
-          // 套用到該週 7 格：統一高度並蓋掉 aspect-ratio
+          // 統一高度並蓋掉 aspect-ratio
           cells.forEach(cell => {
             cell.style.aspectRatio = 'auto';
             cell.style.height = `${Math.ceil(weekHeight)}px`;
@@ -510,9 +487,8 @@
       }
 
       function handleResize() {
-        applyMobileNameTransform();
-        autosizeAllCells();
-        adjustWeekHeights(); // ★ 新增：依每週人數調整行高
+        autosizeAllCells();   // 桌面縮字以塞滿
+        adjustWeekHeights();  // 所有裝置：依內容高度增高，每週同高
       }
 
       // 工具：防抖
@@ -528,10 +504,6 @@
       }
 
       // === 小工具 ===
-      function lastTwo(str) {
-        const arr = Array.from(String(str).trim());
-        return arr.length <= 2 ? arr.join("") : arr.slice(-2).join("");
-      }
       function numToZh(n) { return ["一","二","三","四","五","六","七"][n-1] || String(n); }
       function getCell(row, idx) { return Number.isInteger(idx) && row[idx] != null ? String(row[idx]).trim() : ""; }
 
