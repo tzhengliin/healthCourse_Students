@@ -95,6 +95,10 @@
       }
       .name-row {
         width: 100%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
         text-align: center;
         font-weight: 800;
         line-height: 1.2;
@@ -108,12 +112,55 @@
         text-overflow: ellipsis;
         font-size: 18px; /* ★ 電腦版固定 18px（手機會覆寫） */
       }
+      .name-text {
+        display: inline-block;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      /* 今日餐點圓點（單字＋底色） */
+      .menu-dot {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: 900;
+        line-height: 1;
+        border: 1px solid transparent;
+        flex: 0 0 18px;
+      }
+      .dot-prep {
+        background: #ef4444;
+        color: #fff;
+        border-color: #ef4444;
+      } /* 準備日：紅 */
+      .dot-protein {
+        background: #fff3cd;
+        color: #7a5e00;
+        border-color: #ffe69c;
+      } /* 蛋白日：淡黃 */
+      .dot-slim {
+        background: #22c55e;
+        color: #fff;
+        border-color: #22c55e;
+      } /* 纖體日：綠 */
+      .dot-meta {
+        background: #3b82f6;
+        color: #fff;
+        border-color: #3b82f6;
+      } /* 新陳代謝：藍 */
+
       /* ===== 手機（<=576px）規則 ===== */
       @media (max-width: 576px) {
         /* 手機板：每格至少 100px 高 */
         .board-cell {
-          flex: 2 1 0; /* 你的原設定 */
-          min-height: 100px; /* ★ 新增：最小高度 100px */
+          flex: 2 1 0;
+          min-height: 100px;
         }
         .board-cell.col-wide {
           flex: 3 1 0;
@@ -122,22 +169,21 @@
           flex: 1 1 0;
         }
 
-        /* 手機板：姓名最小 12px（取代原本 10px） */
+        /* 手機板：姓名僅倒數兩字、最小 12px */
         .name-row {
-          font-size: 12px !important; /* ★ 新增：最小字級 12px */
+          font-size: 12px !important;
           padding: 2px 4px;
         }
-
         .day-label {
           font-size: 0.8rem;
         }
       }
 
-      /* 若你先前已加過桌機最小 150px，這段可保留；若尚未加，建議一起加入 */
+      /* 桌機最小 150px */
       @media (min-width: 577px) {
         .board-cell {
           min-height: 150px;
-        } /* 桌機最小 150px */
+        }
       }
 
       /* ===== 下方表格 ===== */
@@ -146,7 +192,7 @@
         font-size: 1rem;
         padding: 0.5em 0.65em;
         line-height: 1;
-      } /* 放大一點 */
+      }
       .status-dot {
         display: inline-block;
         width: 12px;
@@ -384,6 +430,7 @@
           const dayIdx = colIndexByLabel["第幾天"];
           const startIdx = colIndexByLabel["開始日期"];
           const endIdx = colIndexByLabel["結束日期"];
+          const menuIdx = colIndexByLabel["今日菜單"];
 
           const records = [];
           for (const row of bodyRows) {
@@ -467,14 +514,13 @@
                 const mobile = `<span class="status-dot ${dotBg} d-inline-block d-sm-none" title="${escapeHtml(s)}" aria-label="${escapeHtml(s)}"></span>`;
                 tds.push(`<td class="${colClass(headerDisplay)}">${desktop}${mobile}</td>`);
               } else if (sourceHeader === "今日菜單" && txt) {
-                const s = txt.replace(/\s/g, "");
-                let cls = "";
-                if (/^(準備日|準)$/i.test(s)) cls = "bg-danger text-white";
-                else if (/^(纖體日|纖)$/i.test(s)) cls = "bg-success text-white";
-                else if (/^(蛋白日|蛋)$/i.test(s)) cls = "bg-secondary text-white";
-                else if (/^(新陳代謝日|代)$/i.test(s)) cls = "bg-primary text-white";
-                if (cls) tds.push(`<td class="${colClass(headerDisplay)}"><span class="badge ${cls} badge-menu">${escapeHtml(txt)}</span></td>`);
-                else tds.push(`<td class="${colClass(headerDisplay)}">${escapeHtml(txt)}</td>`);
+                // ★ 表格徽章（蛋白日改成淡黃色）
+                const mv = menuVisual(txt);
+                if (mv) {
+                  tds.push(`<td class="${colClass(headerDisplay)}"><span class="badge ${mv.badgeClass} badge-menu">${escapeHtml(txt)}</span></td>`);
+                } else {
+                  tds.push(`<td class="${colClass(headerDisplay)}">${escapeHtml(txt)}</td>`);
+                }
               } else {
                 tds.push(`<td class="${colClass(headerDisplay)}">${escapeHtml(txt)}</td>`);
               }
@@ -487,7 +533,7 @@
           $tbody.innerHTML = rowsHtml.join("");
           applyFilter();
 
-          // 地圖渲染：把名字放到對應天數（支援 /／\＼ 分割多名）
+          // 地圖渲染：把名字放到對應天數（支援 /／\＼ 分割多名），並加上餐點圓點
           renderBoardNames(records, colIndexByLabel);
 
           // 完成 DOM 後：做手機姓名/欄寬調整，再設置「全空週的固定高度」
@@ -499,45 +545,65 @@
         }
       }
 
-      // 把學員名字放到對應格子
+      // 把學員名字放到對應格子（含餐點圓點）
       function renderBoardNames(records, colIndexByLabel) {
         document.querySelectorAll(".board-cell .names-full").forEach((el) => (el.innerHTML = ""));
 
         const nameIdx = colIndexByLabel["學員姓名"];
         const dayIdx = colIndexByLabel["第幾天"];
         const statusIdx = colIndexByLabel["狀態"];
+        const menuIdx = colIndexByLabel["今日菜單"];
         const SPLIT_RE = /[\/／﹨＼]/;
 
-        const dayMap = new Map(); // day -> names[]
+        const dayMap = new Map(); // day -> [{name, mv}]
         for (const rec of records) {
           const status = getCell(rec.row, statusIdx);
           const keep = BOARD_STATUS_WHITELIST.length === 0 || BOARD_STATUS_WHITELIST.some((s) => status.includes(s));
           if (!keep) continue;
 
-          const raw = getCell(rec.row, nameIdx);
-          const parts = raw
+          const rawName = getCell(rec.row, nameIdx);
+          const parts = rawName
             .split(SPLIT_RE)
             .map((s) => s.trim())
             .filter(Boolean);
           const nDay = Number(getCell(rec.row, dayIdx));
           if (!Number.isFinite(nDay) || nDay <= 0 || nDay > MAX_DAYS) continue;
 
+          const menuTxt = getCell(rec.row, menuIdx);
+          const mv = menuVisual(menuTxt); // 可能為 null
+
           if (!dayMap.has(nDay)) dayMap.set(nDay, []);
-          dayMap.get(nDay).push(...parts);
+          for (const p of parts) {
+            dayMap.get(nDay).push({ name: p, mv });
+          }
         }
 
         for (let day = 1; day <= MAX_DAYS; day++) {
-          const names = dayMap.get(day) || [];
+          const items = dayMap.get(day) || [];
           const cell = document.getElementById(`cell-day-${day}`);
           if (!cell) continue;
 
           const wrap = cell.querySelector(".names-full");
-          for (const name of names) {
+          for (const it of items) {
             const r = document.createElement("div");
             r.className = "name-row";
-            r.dataset.fullname = name; // 保留全名
-            r.textContent = name; // 初始全名（手機稍後裁成倒數兩字）
-            r.title = name;
+            r.dataset.fullname = it.name;
+
+            // 餐點圓點（若無法辨識菜單，就不顯示）
+            if (it.mv) {
+              const dot = document.createElement("span");
+              dot.className = `menu-dot ${it.mv.dotClass}`;
+              dot.textContent = it.mv.char;
+              dot.title = it.mv.title;
+              r.appendChild(dot);
+            }
+
+            const nt = document.createElement("span");
+            nt.className = "name-text";
+            nt.textContent = it.name;
+            r.appendChild(nt);
+
+            r.title = it.name;
             wrap.appendChild(r);
           }
         }
@@ -549,12 +615,14 @@
 
         // 還原全名（避免反覆切換造成裁切累積）
         document.querySelectorAll(".name-row").forEach((r) => {
-          if (r.dataset.fullname) r.textContent = r.dataset.fullname;
+          const nt = r.querySelector(".name-text");
+          const full = r.dataset.fullname || nt?.textContent || "";
+          if (nt) nt.textContent = full;
         });
         // 清除欄寬分類
         document.querySelectorAll(".board-cell").forEach((cell) => {
           cell.classList.remove("col-wide", "col-narrow");
-          cell.style.height = ""; // 清除可能的「全空週固定高度」
+          cell.style.height = "";
           cell.style.minHeight = "";
         });
 
@@ -562,8 +630,10 @@
 
         // 手機：姓名 → 倒數兩字
         document.querySelectorAll(".name-row").forEach((r) => {
-          const full = r.dataset.fullname || r.textContent || "";
-          r.textContent = lastTwo(full);
+          const full = r.dataset.fullname || "";
+          const short = lastTwo(full);
+          const nt = r.querySelector(".name-text");
+          if (nt) nt.textContent = short;
         });
 
         // 依直欄（1..7）判斷是否有姓名
@@ -575,7 +645,7 @@
         }
       }
 
-      // ★ 只有整週沒有姓名時，才把該 row 的 7 格設為「與週標籤同高」
+      // ★ 只有整週沒有姓名時，才把該 row 的 7 格設為「與週標籤同高」（以 min-height）
       function adjustWeekMinHeights() {
         const rows = Array.from(document.querySelectorAll("#boardGrid .board-row"));
         const mobile = isMobile();
@@ -585,16 +655,15 @@
           const cells = Array.from(row.querySelectorAll(".board-cell"));
           if (!cells.length) return;
 
-          // 先清掉舊的 inline 限制
+          // 清除舊限制
           cells.forEach((cell) => {
             cell.style.height = "";
             cell.style.minHeight = "";
           });
 
-          // 判斷這週是否完全沒有姓名
+          // 判斷是否完全沒有姓名
           const hasAnyName = cells.some((cell) => cell.querySelector(".name-row"));
           if (!hasAnyName) {
-            // 量週標籤高度（以一致的三字「週數」量測）
             let tagH = 0;
             if (tag) {
               const original = tag.textContent;
@@ -602,22 +671,17 @@
               tagH = Math.ceil(tag.getBoundingClientRect().height);
               tag.textContent = original;
             }
-            if (!tagH || tagH < 40) tagH = 40; // 後備值
-
-            const floor = mobile ? 100 : 150; // ★ 手機 100、桌機 150
+            if (!tagH || tagH < 40) tagH = 40;
+            const floor = mobile ? 100 : 150;
             const minH = Math.max(tagH, floor);
-
-            // 用 minHeight（不是 height）→ 不會蓋掉 CSS 的更高需求
             cells.forEach((cell) => {
               cell.style.minHeight = `${minH}px`;
             });
           }
-          // 有姓名的週：不設 inline 高度，讓內容自然撐高，
-          // 同時交給 CSS 的 min-height 100/150 做底線。
         });
       }
 
-      // 計算順序：手機姓名/欄寬 → 若整週全空則設定固定高度
+      // 計算順序：手機姓名/欄寬 → 最小高度（全空週）
       function handleResize() {
         applyMobileNameTransform();
         adjustWeekMinHeights();
@@ -648,6 +712,48 @@
           const hit = _rawRows[i]?.includes(q);
           tr.classList.toggle("d-none", !hit);
         });
+      }
+
+      // === 菜單對應：圓點（地圖）與表格徽章 ===
+      function menuVisual(val) {
+        const s = String(val || "").replace(/\s/g, "");
+        // 準備日
+        if (/^(準備日|準)$/i.test(s)) {
+          return {
+            char: "準",
+            dotClass: "dot-prep",
+            badgeClass: "bg-danger text-white",
+            title: "準備日",
+          };
+        }
+        // 蛋白日（淡黃色）
+        if (/^(蛋白日|蛋)$/i.test(s)) {
+          return {
+            char: "蛋",
+            dotClass: "dot-protein",
+            badgeClass: "bg-warning-subtle text-dark border border-warning-subtle",
+            title: "蛋白日",
+          };
+        }
+        // 纖體日（綠）
+        if (/^(纖體日|纖)$/i.test(s)) {
+          return {
+            char: "纖",
+            dotClass: "dot-slim",
+            badgeClass: "bg-success text-white",
+            title: "纖體日",
+          };
+        }
+        // 新陳代謝日（藍）
+        if (/^(新陳代謝日|新|代)$/i.test(s)) {
+          return {
+            char: "新",
+            dotClass: "dot-meta",
+            badgeClass: "bg-primary text-white",
+            title: "新陳代謝日",
+          };
+        }
+        return null;
       }
 
       // === 小工具 ===
