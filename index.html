@@ -6,10 +6,11 @@
     <title>健管學員清單（Sheets API v4 → Bootstrap 5）</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
     <style>
-      /* ★ 左右 0，避免容器在斷點時留白 */
+      /* 頂部留白；左右 0 */
       body {
         margin: 0;
-        padding: 0;
+        padding: 12px 0 0 0;
+        padding-top: max(12px, env(safe-area-inset-top));
       }
 
       .table-fixed-header thead th {
@@ -22,14 +23,96 @@
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Liberation Mono", monospace;
       }
 
-      /* 狀態徽章（桌面版文字） */
+      /* ===== 進度地圖（純色、左到右、每週一行） ===== */
+      .board-wrap {
+        width: 100%;
+      }
+      .board-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        width: 100%;
+      }
+      /* 每行：左側週標籤 + 7 格天數 */
+      .board-row {
+        display: grid;
+        grid-template-columns: 40px repeat(7, minmax(0, 1fr));
+        gap: 8px;
+        width: 100%;
+      }
+
+      /* 垂直週數標籤（用 c1~c7 套色） */
+      .week-tag {
+        writing-mode: vertical-rl;
+        text-orientation: mixed;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 10px;
+        color: #fff;
+        font-weight: 800;
+        letter-spacing: 0.05em;
+        border: 1px solid rgba(0, 0, 0, 0.06);
+        padding: 4px 0;
+        user-select: none;
+      }
+
+      /* 天數方格 */
+      .board-cell {
+        position: relative;
+        aspect-ratio: 1 / 1; /* 正方形，自適應寬度 */
+        border-radius: 12px;
+        border: 1px solid #d5e8d5;
+        background: #edf7ee; /* ★ 淡綠底 */
+        overflow: hidden;
+      }
+      .day-label {
+        position: absolute;
+        top: 4px;
+        left: 6px;
+        font-weight: 800;
+        font-size: 0.9rem;
+        color: #164e22;
+        text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
+        pointer-events: none;
+      }
+
+      /* 名字容器：避開上方天數，不遮擋 */
+      .names-full {
+        position: absolute;
+        left: 6px;
+        right: 6px;
+        top: 26px;
+        bottom: 6px; /* ★ 預留上方 26px 給天數 */
+        display: flex;
+        flex-direction: column;
+        justify-content: space-evenly;
+        gap: 2px;
+        overflow: hidden; /* 名字會被自動調整字級以塞進高度 */
+      }
+      .name-row {
+        width: 100%;
+        text-align: center;
+        font-weight: 800;
+        line-height: 1.15;
+        color: #0f5132;
+        background: rgba(255, 255, 255, 0.95);
+        border: 1px solid rgba(0, 0, 0, 0.06);
+        border-radius: 8px;
+        padding: 2px 6px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        /* 字級由 JS 自動計算 */
+      }
+
+      /* ===== 下方表格（沿用） ===== */
       .badge-status {
         font-weight: 700;
         font-size: 0.95rem;
         padding: 0.5em 0.65em;
         line-height: 1;
       }
-      /* 手機版狀態小圓點 */
       .status-dot {
         display: inline-block;
         width: 12px;
@@ -38,23 +121,18 @@
         border: 1px solid var(--bs-border-color, #dee2e6);
         vertical-align: middle;
       }
-
-      /* 今日菜單徽章 */
       .badge-menu {
         font-weight: 600;
         font-size: 0.9rem;
         padding: 0.45em 0.6em;
         line-height: 1;
       }
-
-      /* 表格整體置中（含表頭與內容） */
       .table-center thead th,
       .table-center tbody td {
         text-align: center;
         vertical-align: middle;
       }
 
-      /* 週數：7 個小方格（>=sm 顯示完整 1~7；<sm 只顯示單一當週格） */
       .week-grid {
         display: inline-flex;
         gap: 0.3rem;
@@ -77,74 +155,74 @@
         background: var(--bs-light);
         color: var(--bs-secondary);
       }
-      /* 彩虹顏色：紅橙黃綠藍靛紫（1→7） */
-      .week-box.c1 {
+
+      /* 週色（表格與週標籤共用） */
+      .c1 {
         background: #ef4444;
         color: #fff;
         border-color: #ef4444;
         box-shadow: 0 0 0 0.12rem rgba(239, 68, 68, 0.15);
-      } /*紅*/
-      .week-box.c2 {
+      }
+      .c2 {
         background: #f59e0b;
         color: #111;
         border-color: #f59e0b;
         box-shadow: 0 0 0 0.12rem rgba(245, 158, 11, 0.15);
-      } /*橙*/
-      .week-box.c3 {
+      }
+      .c3 {
         background: #facc15;
         color: #111;
         border-color: #facc15;
         box-shadow: 0 0 0 0.12rem rgba(250, 204, 21, 0.2);
-      } /*黃*/
-      .week-box.c4 {
+      }
+      .c4 {
         background: #22c55e;
         color: #fff;
         border-color: #22c55e;
         box-shadow: 0 0 0 0.12rem rgba(34, 197, 94, 0.18);
-      } /*綠*/
-      .week-box.c5 {
+      }
+      .c5 {
         background: #3b82f6;
         color: #fff;
         border-color: #3b82f6;
         box-shadow: 0 0 0 0.12rem rgba(59, 130, 246, 0.18);
-      } /*藍*/
-      .week-box.c6 {
+      }
+      .c6 {
         background: #6366f1;
         color: #fff;
         border-color: #6366f1;
         box-shadow: 0 0 0 0.12rem rgba(99, 102, 241, 0.18);
-      } /*靛*/
-      .week-box.c7 {
+      }
+      .c7 {
         background: #a855f7;
         color: #fff;
         border-color: #a855f7;
         box-shadow: 0 0 0 0.12rem rgba(168, 85, 247, 0.18);
-      } /*紫*/
+      }
     </style>
   </head>
   <body>
-    <!-- ★ 改用 container-fluid + px-0，左右 padding 皆為 0 -->
-    <div class="container-fluid px-0 pt-3">
+    <div class="container-fluid px-0">
+      <!-- ===== 進度地圖區塊 ===== -->
+      <div class="board-wrap px-3 mb-3">
+        <h2 class="h5 mb-2">進度地圖</h2>
+        <div id="boardGrid" class="board-grid" aria-label="健管 45 天（每週左到右）"></div>
+      </div>
+
       <h1 class="h3 mb-3 px-3">高雄博士班-健管45學員清單</h1>
 
       <!-- 篩選 + 重新讀取 -->
       <div class="row g-2 align-items-center mb-3 px-3">
-        <div class="col-auto">
-          <label for="filterInput" class="col-form-label">關鍵字篩選：</label>
-        </div>
-        <div class="col-12 col-sm-6 col-md-4">
-          <input type="text" id="filterInput" class="form-control" placeholder="輸入姓名 / 教練 / 狀態 / 菜單 …" />
-        </div>
-        <div class="col-auto">
-          <button id="reloadBtn" class="btn btn-outline-primary">重新讀取</button>
-        </div>
+        <div class="col-auto"><label for="filterInput" class="col-form-label">關鍵字篩選：</label></div>
+        <div class="col-12 col-sm-6 col-md-4"><input type="text" id="filterInput" class="form-control" placeholder="輸入姓名 / 教練 / 狀態 / 菜單 …" /></div>
+        <div class="col-auto"><button id="reloadBtn" class="btn btn-outline-primary">重新讀取</button></div>
       </div>
 
       <!-- 載入中 / 錯誤 -->
       <div id="loading" class="alert alert-secondary mx-3" role="alert">正在從 Google 試算表載入資料…</div>
       <div id="error" class="alert alert-danger d-none mx-3" role="alert"></div>
 
-      <!-- 表格：外層也補少量左右 padding 以免文字緊貼螢幕邊緣 -->
+      <!-- 表格 -->
       <div class="table-responsive px-3">
         <table id="dataTable" class="table table-striped table-hover align-middle table-fixed-header table-center mb-0">
           <thead class="table-light">
@@ -157,20 +235,17 @@
 
     <script>
       // ==== 設定 ====
-      const API_KEY = "AIzaSyD14dE-5ouFvIxnTrwF3zhHqFhh9OW0q8c"; // 你的 API Key
+      const API_KEY = "AIzaSyD14dE-5ouFvIxnTrwF3zhHqFhh9OW0q8c";
       const SHEET_ID = "1vFrSu2c0UWTeyKdDcNwuwVUOSKHdRuTZ3PwzcoLyLEo";
       const SHEET_NAME = "健管學員清單";
 
-      // 來源表頭（讀取用；表內仍是「第幾天」）
       const SOURCE_HEADERS = ["狀態", "第幾天", "學員姓名", "專屬教練", "開始日期", "結束日期", "今日菜單"];
-
-      // 顯示表頭（前端呈現名稱，順序固定）→ 「開始/結束日期」已合併為「執行日期」
       const DISPLAY_HEADERS = ["狀態", "學員姓名", "天數", "週數", "專屬教練", "執行日期", "今日菜單"];
-
-      // 手機（<576px）保留欄位（其餘在手機自動隱藏）
       const MOBILE_KEEP = new Set(["狀態", "學員姓名", "天數", "週數", "專屬教練", "今日菜單"]);
+      const MAX_DAYS = 45;
 
-      const MAX_DAYS = 45; // 45 天計畫
+      // ★ 地圖顯示哪些狀態（預設只顯示「進行中」）
+      const BOARD_STATUS_WHITELIST = ["進行中"];
 
       // ==== DOM ====
       const $loading = document.getElementById("loading");
@@ -179,18 +254,68 @@
       const $tbody = document.getElementById("tbody");
       const $filter = document.getElementById("filterInput");
       const $reload = document.getElementById("reloadBtn");
+      const $board = document.getElementById("boardGrid");
 
-      let _rawRows = []; // 用於關鍵字篩選
+      let _rawRows = []; // 關鍵字篩選基底
+
+      // 測量文字寬度的隱藏節點（用於自動字級）
+      let $measure = null;
+      function getMeasureSpan() {
+        if ($measure) return $measure;
+        $measure = document.createElement("span");
+        $measure.style.position = "absolute";
+        $measure.style.left = "-9999px";
+        $measure.style.top = "-9999px";
+        $measure.style.whiteSpace = "nowrap";
+        $measure.style.fontWeight = "800";
+        document.body.appendChild($measure);
+        return $measure;
+      }
 
       // 初次載入
+      buildBoard();
       fetchAndRender();
 
       // 綁定事件
       $reload.addEventListener("click", fetchAndRender);
       $filter.addEventListener("input", applyFilter);
+      window.addEventListener(
+        "resize",
+        debounce(() => autosizeAllCells(), 100)
+      );
 
       function colClass(headerDisplay) {
         return MOBILE_KEEP.has(headerDisplay) ? "" : "d-none d-sm-table-cell";
+      }
+
+      // === 生成 45 天地圖（每週左到右） ===
+      function buildBoard() {
+        $board.innerHTML = "";
+        for (let w = 1; w <= 7; w++) {
+          const row = document.createElement("div");
+          row.className = "board-row";
+
+          // 週數標籤（垂直） with c{w} 顏色
+          const tag = document.createElement("div");
+          tag.className = `week-tag c${w}`;
+          tag.textContent = `第${numToZh(w)}週`;
+          row.appendChild(tag);
+
+          // 7 天（左到右）
+          for (let c = 1; c <= 7; c++) {
+            const dayAbs = (w - 1) * 7 + c;
+            const cell = document.createElement("div");
+            cell.className = "board-cell";
+            cell.id = `cell-day-${dayAbs}`;
+            cell.setAttribute("data-day", String(dayAbs));
+            cell.innerHTML = `
+              <div class="day-label">${dayAbs}</div>
+              <div class="names-full"></div>
+            `;
+            row.appendChild(cell);
+          }
+          $board.appendChild(row);
+        }
       }
 
       async function fetchAndRender() {
@@ -216,13 +341,11 @@
           const headerRow = values[0].map((v) => (v ?? "").trim());
           const bodyRows = values.slice(1);
 
-          // 來源表頭→索引
           const colIndexByLabel = {};
           headerRow.forEach((label, idx) => {
             if (label) colIndexByLabel[label] = idx;
           });
 
-          // 檢查缺少欄位
           const missing = SOURCE_HEADERS.filter((h) => !(h in colIndexByLabel));
           if (missing.length) showError(`下列表頭在工作表中找不到：${missing.join("、")}。請確認表頭文字一致。`);
 
@@ -231,23 +354,20 @@
           const startIdx = colIndexByLabel["開始日期"];
           const endIdx = colIndexByLabel["結束日期"];
 
-          // 整理可排序記錄
           const records = [];
           for (const row of bodyRows) {
             if (!row || row.every((cell) => String(cell || "").trim() === "")) continue;
-            // 姓名空白略過
-            if (Number.isInteger(nameIdx)) {
-              const nameVal = String(row[nameIdx] ?? "").trim();
-              if (!nameVal) continue;
-            }
+            const nameVal = Number.isInteger(nameIdx) ? String(row[nameIdx] ?? "").trim() : "";
+            if (!nameVal) continue;
 
             const statusTxt = getCell(row, colIndexByLabel["狀態"]);
             const isCompleted = /已完成/i.test(statusTxt);
+            const isInProgress = /進行中/i.test(statusTxt);
 
             const startRaw = getCell(row, startIdx);
-            const startDate = parseSheetDate(startRaw); // 供排序
+            const startDate = parseSheetDate(startRaw);
 
-            records.push({ row, isCompleted, statusTxt, startDate });
+            records.push({ row, statusTxt, isCompleted, isInProgress, startDate });
           }
 
           // 排序：已完成放最後；其餘依開始日期由早到晚
@@ -258,22 +378,19 @@
             return ta - tb;
           });
 
-          // 產生表格
+          // 表格渲染（維持原本）
           const rowsHtml = [];
           _rawRows = [];
-          for (const { row, isCompleted, statusTxt } of records) {
+          for (const rec of records) {
+            const { row, statusTxt, isCompleted } = rec;
             const tds = [];
             const rowTextCollector = [];
 
             for (const headerDisplay of DISPLAY_HEADERS) {
               if (headerDisplay === "週數") {
-                // 由「第幾天」計算週次；「已完成」顯示滿格（7）
                 let weekNum = 0;
-                if (Number.isInteger(dayIdx)) {
-                  const raw = getCell(row, dayIdx);
-                  const n = Number(raw);
-                  if (Number.isFinite(n) && n > 0 && n <= MAX_DAYS) weekNum = Math.ceil(n / 7); // 1..7
-                }
+                const n = Number(getCell(row, dayIdx));
+                if (Number.isFinite(n) && n > 0 && n <= MAX_DAYS) weekNum = Math.ceil(n / 7);
                 const weekNumToRender = isCompleted ? 7 : weekNum;
                 tds.push(`<td class="${colClass(headerDisplay)}">${renderWeekGridResponsive(weekNumToRender)}</td>`);
                 rowTextCollector.push(String(weekNumToRender || ""));
@@ -297,15 +414,13 @@
                 continue;
               }
 
-              // 顯示表頭對應來源表頭
+              // 對應來源表頭
               let sourceHeader = headerDisplay;
               if (headerDisplay === "天數") sourceHeader = "第幾天";
-
               const idx = colIndexByLabel[sourceHeader];
               const txt = getCell(row, idx);
 
               if (sourceHeader === "狀態") {
-                // 狀態：桌面版顯示文字徽章；手機版顯示彩色圓點
                 const s = (statusTxt || txt || "").trim();
                 let badgeCls = "bg-secondary text-white";
                 let dotBg = "bg-secondary";
@@ -319,12 +434,10 @@
                   badgeCls = "bg-success text-white";
                   dotBg = "bg-success";
                 }
-
                 const desktop = `<span class="badge ${badgeCls} badge-status d-none d-sm-inline-block">${escapeHtml(s)}</span>`;
                 const mobile = `<span class="status-dot ${dotBg} d-inline-block d-sm-none" title="${escapeHtml(s)}" aria-label="${escapeHtml(s)}"></span>`;
                 tds.push(`<td class="${colClass(headerDisplay)}">${desktop}${mobile}</td>`);
               } else if (sourceHeader === "今日菜單" && txt) {
-                // 今日菜單徽章
                 const s = txt.replace(/\s/g, "");
                 let cls = "";
                 if (/^(準備日|準)$/i.test(s)) cls = "bg-danger text-white";
@@ -339,18 +452,127 @@
 
               rowTextCollector.push(txt);
             }
-
             _rawRows.push(rowTextCollector.join(" ").toLowerCase());
             rowsHtml.push(`<tr>${tds.join("")}</tr>`);
           }
-
           $tbody.innerHTML = rowsHtml.join("");
           applyFilter();
+
+          // 地圖：把名字放到對應天數（支援「/」分割）
+          renderBoardNames(records, colIndexByLabel);
+
+          // 依目前尺寸計算一次字級
+          autosizeAllCells();
         } catch (err) {
           showError("讀取失敗：" + (err?.message || err));
         } finally {
           toggleLoading(false);
         }
+      }
+
+      // 把學員名字放到對應格子（支援「/」「／」「﹨」「＼」分割）
+      function renderBoardNames(records, colIndexByLabel) {
+        // 清空
+        document.querySelectorAll(".board-cell .names-full").forEach((el) => (el.innerHTML = ""));
+
+        const nameIdx = colIndexByLabel["學員姓名"];
+        const dayIdx = colIndexByLabel["第幾天"];
+        const statusIdx = colIndexByLabel["狀態"];
+
+        const SPLIT_RE = /[\/／﹨＼]/; // 支援半形/全形各種斜線
+
+        const dayMap = new Map(); // day -> names[]
+        for (const rec of records) {
+          const status = getCell(rec.row, statusIdx);
+          const keep = BOARD_STATUS_WHITELIST.length === 0 || BOARD_STATUS_WHITELIST.some((s) => status.includes(s));
+          if (!keep) continue;
+
+          const raw = getCell(rec.row, nameIdx);
+          const parts = raw
+            .split(SPLIT_RE)
+            .map((s) => s.trim())
+            .filter(Boolean);
+          const nDay = Number(getCell(rec.row, dayIdx));
+          if (!Number.isFinite(nDay) || nDay <= 0 || nDay > MAX_DAYS) continue;
+
+          if (!dayMap.has(nDay)) dayMap.set(nDay, []);
+          dayMap.get(nDay).push(...parts);
+        }
+
+        // 寫入 DOM
+        for (let day = 1; day <= MAX_DAYS; day++) {
+          const names = dayMap.get(day) || [];
+          const cell = document.getElementById(`cell-day-${day}`);
+          if (!cell) continue;
+
+          const wrap = cell.querySelector(".names-full");
+          names.forEach((name) => {
+            const row = document.createElement("div");
+            row.className = "name-row";
+            row.textContent = name;
+            row.title = name;
+            wrap.appendChild(row);
+          });
+        }
+      }
+
+      // === 自動把名字字級放到「該格能容納的最大值」且不遮到天數 ===
+      function autosizeAllCells() {
+        const cells = document.querySelectorAll(".board-cell");
+        cells.forEach((cell) => autosizeCell(cell));
+      }
+
+      function autosizeCell(cell) {
+        const wrap = cell.querySelector(".names-full");
+        const rows = Array.from(wrap.querySelectorAll(".name-row"));
+        if (rows.length === 0) return;
+
+        const measure = getMeasureSpan();
+
+        // 可用寬度/高度（避開左右 6px padding 與上方 26px）
+        const maxWidth = wrap.clientWidth; // 已扣除左右 6px
+        const maxHeight = wrap.clientHeight; // 已扣除上方 26px 與底 6px
+        if (maxWidth <= 0 || maxHeight <= 0) return;
+
+        // 先用高度估一個上限字級
+        let candidate = Math.floor((maxHeight / rows.length) * 0.9); // 預留 10% 緩衝
+        candidate = Math.max(10, candidate); // 不低於 10px
+
+        // 再考慮文字寬度約束（所有名字一致字級，以最小者為準）
+        let finalSize = candidate;
+        rows.forEach((r) => {
+          measure.style.fontSize = candidate + "px";
+          measure.style.fontFamily = getComputedStyle(r).fontFamily;
+          measure.style.fontWeight = "800";
+          measure.textContent = r.textContent || "";
+          const w = measure.getBoundingClientRect().width;
+          if (w > maxWidth) {
+            const scale = (maxWidth / w) * 0.98; // 再留 2% 緩衝
+            finalSize = Math.min(finalSize, Math.max(10, Math.floor(candidate * scale)));
+          }
+        });
+
+        // 設定字級
+        rows.forEach((r) => {
+          r.style.fontSize = finalSize + "px";
+        });
+
+        // 若加總高度仍略超出（極端長名），微幅縮小到剛好容納
+        const totalHeight = rows.reduce((sum, r) => sum + r.getBoundingClientRect().height + 2 /* gap */, 0);
+        if (totalHeight > maxHeight) {
+          const scale = Math.max(0.6, (maxHeight / totalHeight) * 0.98);
+          const size = Math.max(10, Math.floor(finalSize * scale));
+          rows.forEach((r) => (r.style.fontSize = size + "px"));
+        }
+      }
+
+      // 工具：防抖
+      function debounce(fn, wait) {
+        let t;
+        return (...args) => {
+          clearTimeout(t);
+          t = setTimeout(() => fn.apply(null, args), wait);
+        };
       }
 
       function applyFilter() {
@@ -367,21 +589,21 @@
       }
 
       // === 小工具 ===
+      function numToZh(n) {
+        return ["一", "二", "三", "四", "五", "六", "七"][n - 1] || String(n);
+      }
       function getCell(row, idx) {
         return Number.isInteger(idx) && row[idx] != null ? String(row[idx]).trim() : "";
       }
 
       // 週數渲染（彩虹進度）
       function renderWeekGridResponsive(weekNum) {
-        // 桌面版：1~7 進度上色
         let grid = '<div class="week-grid d-none d-sm-inline-flex" aria-label="週數進度">';
         for (let i = 1; i <= 7; i++) {
-          const cls = weekNum >= i && i <= 7 ? `c${i}` : "inactive";
-          grid += `<span class="week-box ${cls}" title="第 ${i} 週">${i}</span>`;
+          const cls = weekNum >= i && i <= 7 ? `week-box c${i}` : "week-box inactive";
+          grid += `<span class="${cls}" title="第 ${i} 週">${i}</span>`;
         }
         grid += "</div>";
-
-        // 手機：單一當週格
         let mobile;
         if (weekNum >= 1 && weekNum <= 7) {
           mobile = `<span class="week-box c${weekNum} d-inline-flex d-sm-none" title="第 ${weekNum} 週">${weekNum}</span>`;
@@ -391,54 +613,44 @@
         return grid + mobile;
       }
 
-      // 顯示友善日期（可解析則轉 YYYY/MM/DD，否則原字串）
+      // 友善日期顯示
       function formatDateDisplay(val) {
         const d = parseSheetDate(val);
         if (!d) return String(val || "").trim();
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, "0");
-        const dd = String(d.getDate()).padStart(2, "0");
+        const y = d.getFullYear(),
+          m = String(d.getMonth() + 1).padStart(2, "0"),
+          dd = String(d.getDate()).padStart(2, "0");
         return `${y}/${m}/${dd}`;
       }
 
-      // 解析可能的日期格式 / 序列
+      // 解析日期 / Sheets 序列
       function parseSheetDate(val) {
         if (val == null) return null;
         const s = String(val).trim();
         if (!s) return null;
-
-        // Sheets 日期序列（約 1900-01-01 之後）
         if (/^\d+(\.\d+)?$/.test(s)) {
           const n = Number(s);
           if (Number.isFinite(n) && n > 30000 && n < 70000) return serialToDate(n);
         }
-
-        // 常見格式
         const norm = s.replace(/\./g, "-").replace(/\//g, "-");
         const parts = norm.split("-");
         if (parts.length === 3) {
           const [a, b, c] = parts;
           if (a.length === 4) {
-            // YYYY-M-D
             const d = new Date(Number(a), Number(b) - 1, Number(c));
             if (!isNaN(d)) return d;
           } else if (c.length === 4) {
-            // M-D-YYYY
             const d = new Date(Number(c), Number(a) - 1, Number(b));
             if (!isNaN(d)) return d;
           }
         }
-
         const d = new Date(s);
         return isNaN(d) ? null : d;
       }
-
       function serialToDate(n) {
-        const epoch = Date.UTC(1899, 11, 30); // 1899-12-30
-        const ms = n * 86400 * 1000;
-        return new Date(epoch + ms);
+        const epoch = Date.UTC(1899, 11, 30);
+        return new Date(epoch + n * 86400 * 1000);
       }
-
       function escapeHtml(str) {
         return String(str).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
       }
