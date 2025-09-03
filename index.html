@@ -53,15 +53,14 @@
         user-select: none;
       }
 
-      /* 天數方格（預設正方形；JS 會依需要覆寫高度） */
+      /* 天數方格（高度將由 JS 覆寫；無需固定為正方形） */
       .board-cell {
         position: relative;
-        aspect-ratio: 1 / 1;
         border-radius: 12px;
         border: 1px solid #d5e8d5;
         background: #edf7ee;
         overflow: hidden;
-        flex: 1 1 0; /* 桌面：等寬 */
+        flex: 1 1 0; /* 桌面：等寬（手機由 class 控制 col-wide/col-narrow） */
       }
 
       .day-label {
@@ -75,7 +74,7 @@
       .names-full {
         position: absolute; left: 6px; right: 6px; top: 26px; bottom: 6px;
         display: flex; flex-direction: column; justify-content: flex-start;
-        gap: 4px; overflow: hidden;
+        gap: 4px; overflow: visible; /* 讓 scrollHeight 反映完整需求高度 */
       }
       .name-row {
         width: 100%; text-align: center; font-weight: 800; line-height: 1.2;
@@ -405,7 +404,7 @@
             const row = document.createElement("div");
             row.className = "name-row";
             row.dataset.fullname = name; // 保留完整姓名
-            row.textContent = name;      // 初始全名，稍後視裝置裁切
+            row.textContent = name;      // 初始全名（手機稍後裁為倒數兩字）
             row.title = name;
             wrap.appendChild(row);
           });
@@ -486,45 +485,61 @@
         }
       }
 
-      // 依每週內容動態調整行高（同週同高；不小於正方形基準）
-      // ★ 每週高度只依「名字內容需要的高度」決定（手機/桌面皆適用）
-function adjustWeekHeights() {
-  const rows = Array.from(document.querySelectorAll('#boardGrid .board-row'));
-  rows.forEach((row) => {
-    const cells = Array.from(row.querySelectorAll('.board-cell'));
-    if (!cells.length) return;
+      // ★ 每週高度只依「名字內容需要的高度」決定；
+      //   若該週 7 格都沒有姓名，則高度固定為「週數三個字」的高度
+      function adjustWeekHeights() {
+        const rows = Array.from(document.querySelectorAll('#boardGrid .board-row'));
+        rows.forEach((row) => {
+          const cells = Array.from(row.querySelectorAll('.board-cell'));
+          if (!cells.length) return;
 
-    // 回復自然值以便重算
-    cells.forEach(cell => {
-      cell.style.height = '';
-      cell.style.aspectRatio = ''; // 解除 1:1，以便改成依內容高度
-    });
+          // 回復自然值以便重算
+          cells.forEach(cell => {
+            cell.style.height = '';
+          });
 
-    let weekHeight = 0;
-    cells.forEach(cell => {
-      const namesWrap = cell.querySelector('.names-full');
-      const namesH = namesWrap ? namesWrap.scrollHeight : 0;
+          // 統計該週是否有任一格有姓名
+          const totalNameCount = cells.reduce((sum, cell) => {
+            const wrap = cell.querySelector('.names-full');
+            return sum + (wrap ? wrap.querySelectorAll('.name-row').length : 0);
+          }, 0);
 
-      // 26：上方天數標籤預留；6：下方預留；可依你的樣式微調
-      const need = 26 + namesH + 6;
-      weekHeight = Math.max(weekHeight, need);
-    });
+          let weekHeight = 0;
 
-    // 沒有名字時避免太扁，給個很小的下限（可改）
-    weekHeight = Math.max(weekHeight, 42);
+          if (totalNameCount === 0) {
+            // 沒有姓名：高度 = 週標籤顯示「週數」三字的高度（以當前樣式量測）
+            const tag = row.querySelector('.week-tag');
+            // 暫時把週標籤內容換成「週數」三字量測高度，再換回原字
+            const prev = tag ? tag.textContent : '';
+            if (tag) {
+              const original = tag.textContent;
+              tag.textContent = '週數';
+              // 取 scrollHeight（包含字體、padding、border 的實際顯示高度）
+              weekHeight = Math.ceil(tag.scrollHeight);
+              tag.textContent = original || prev;
+            }
+            if (!weekHeight || weekHeight < 1) weekHeight = 40; // 後備值
+          } else {
+            // 有姓名：高度取 7 格中「名字容器需要高度 + 上下預留」的最大值
+            cells.forEach(cell => {
+              const namesWrap = cell.querySelector('.names-full');
+              const namesH = namesWrap ? namesWrap.scrollHeight : 0;
+              const need = 26 + namesH + 6; // 上 26（天數）+ 下 6
+              weekHeight = Math.max(weekHeight, need);
+            });
+          }
 
-    // 套用到該週 7 格：同高
-    cells.forEach(cell => {
-      cell.style.aspectRatio = 'auto';
-      cell.style.height = `${Math.ceil(weekHeight)}px`;
-    });
-  });
-}
+          // 套用統一高度（手機/桌面一致）
+          cells.forEach(cell => {
+            cell.style.height = `${weekHeight}px`;
+          });
+        });
+      }
 
       function handleResize() {
         applyMobileNameTransform(); // 手機倒數兩字 + 欄寬分類
         autosizeAllCells();         // 桌面縮字
-        adjustWeekHeights();        // 兩端皆依內容增高
+        adjustWeekHeights();        // 依規則計算每週高度
       }
 
       // 工具：防抖
@@ -602,4 +617,3 @@ function adjustWeekHeights() {
     </script>
   </body>
 </html>
-
