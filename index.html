@@ -53,16 +53,15 @@
         user-select: none;
       }
 
-      /* 天數方格 */
+      /* 天數方格（預設正方形；之後會由 JS 覆蓋高度，讓「每週同高且可增高」） */
       .board-cell {
         position: relative;
-        aspect-ratio: 1 / 1;  /* 正方形，自適應寬度 */
+        aspect-ratio: 1 / 1;  /* 正方形，自適應寬度（JS 調高時會覆蓋） */
         border-radius: 12px;
         border: 1px solid #d5e8d5;
         background: #edf7ee;  /* 淡綠底 */
         overflow: hidden;
-        /* 桌面 & 預設：等寬 */
-        flex: 1 1 0;
+        flex: 1 1 0;          /* 桌面 & 預設：等寬 */
       }
       /* 手機：依有無姓名調整寬度比例（有名 3、無名 2 ⇒ 無名為 2/3） */
       @media (max-width: 576px) {
@@ -86,7 +85,7 @@
       .name-row {
         width: 100%; text-align: center; font-weight: 800; line-height: 1.15;
         color: #0f5132; background: rgba(255,255,255,.95);
-        border: 1px solid rgba(0,0,0,.06); border-radius: 8px;
+        border: 1px solid rgba(0,0,0,0.06); border-radius: 8px;
         padding: 2px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         /* 桌面：字級由 JS 自動計算；手機：固定最小字級並只顯示倒數兩字 */
       }
@@ -285,7 +284,7 @@
             return ta - tb;
           });
 
-          // 表格渲染（與你前版一致）
+          // 表格渲染
           const rowsHtml = [];
           _rawRows = [];
           for (const rec of records) {
@@ -358,7 +357,7 @@
           // 地圖渲染：把名字放到對應天數（支援 /／\＼ 分割多名）
           renderBoardNames(records, colIndexByLabel);
 
-          // 桌面自動字級 / 手機極小名 + 無名格縮 2/3
+          // 桌面自動字級 / 手機極小名 + 無名格縮 2/3 + 依人數增高每週行高
           handleResize();
         } catch (err) {
           showError("讀取失敗：" + (err?.message || err));
@@ -411,7 +410,7 @@
         }
       }
 
-      // 手機：姓名改顯示倒數兩字；並標記「無名格」為 compact
+      // 手機：姓名改顯示倒數兩字；並標記「無名格」為 compact（2/3 寬）
       function applyMobileNameTransform() {
         const isM = isMobile();
         const cells = document.querySelectorAll(".board-cell");
@@ -439,7 +438,7 @@
 
       // 桌面：自動把姓名字級撐滿可用高度/寬度；手機：固定極小字級（CSS 已處理）
       function autosizeAllCells() {
-        if (isMobile()) return; // 手機直接用 10px，且只顯示兩字
+        if (isMobile()) return; // 手機固定 10px，且只顯示兩字
         const cells = document.querySelectorAll(".board-cell");
         cells.forEach(cell => autosizeCell(cell));
       }
@@ -480,9 +479,40 @@
         }
       }
 
+      // ★ 依每週人數動態調整每週行高（使該週 7 格同高，且不小於正方形原始高度）
+      function adjustWeekHeights() {
+        const rows = Array.from(document.querySelectorAll('#boardGrid .board-row'));
+        rows.forEach((row) => {
+          const cells = Array.from(row.querySelectorAll('.board-cell'));
+          if (!cells.length) return;
+
+          // 回復到自然（正方形）以便重算
+          cells.forEach(cell => {
+            cell.style.height = '';
+            cell.style.aspectRatio = ''; // 先移除 inline，回到 CSS 的 1/1
+          });
+
+          let weekHeight = 0;
+          cells.forEach(cell => {
+            const cellWidth = cell.getBoundingClientRect().width; // 正方形的基準高度
+            const namesWrap = cell.querySelector('.names-full');
+            const neededByNames = 26 + (namesWrap ? namesWrap.scrollHeight : 0) + 6 + 2; // 頂部 26 + 底 6 + 餘裕 2
+            const need = Math.max(cellWidth, neededByNames);
+            weekHeight = Math.max(weekHeight, need);
+          });
+
+          // 套用到該週 7 格：統一高度並蓋掉 aspect-ratio
+          cells.forEach(cell => {
+            cell.style.aspectRatio = 'auto';
+            cell.style.height = `${Math.ceil(weekHeight)}px`;
+          });
+        });
+      }
+
       function handleResize() {
         applyMobileNameTransform();
         autosizeAllCells();
+        adjustWeekHeights(); // ★ 新增：依每週人數調整行高
       }
 
       // 工具：防抖
