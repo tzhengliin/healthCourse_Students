@@ -37,7 +37,7 @@
       /* 每行：左側週標籤 + 右側 7 格（右側用 flex，讓同一 row 自動等高） */
       .board-row {
         display: grid;
-        grid-template-columns: 40px 1fr; /* 週標籤 + 天數區 */
+        grid-template-columns: 40px 1fr;
         gap: 8px;
         width: 100%;
       }
@@ -157,7 +157,6 @@
 
       /* ===== 手機（<=576px）規則 ===== */
       @media (max-width: 576px) {
-        /* 手機板：每格至少 100px 高 */
         .board-cell {
           flex: 2 1 0;
           min-height: 100px;
@@ -169,7 +168,6 @@
           flex: 1 1 0;
         }
 
-        /* 手機板：姓名僅倒數兩字、最小 12px */
         .name-row {
           font-size: 12px !important;
           padding: 2px 4px;
@@ -279,15 +277,108 @@
         border-color: #a855f7;
         box-shadow: 0 0 0 0.12rem rgba(168, 85, 247, 0.18);
       }
+
+      /* ===== Modal 內 45 天日曆 ===== */
+      .calendar-45 {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 6px;
+      }
+      .cal-cell {
+        border: 1px solid var(--bs-border-color, #dee2e6);
+        border-radius: 0.5rem;
+        padding: 6px;
+        min-height: 84px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        align-items: center;
+        justify-content: flex-start;
+        text-align: center;
+        transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+      }
+      .cal-muted {
+        background: var(--bs-light);
+        color: var(--bs-secondary);
+      }
+      .cal-active {
+        background: #f8fbff;
+        border-color: #b6e0fe;
+      }
+
+      .cal-head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      /* 天數圈圈：無外框、白底黑字（字稍小） */
+      .cal-idx {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 0;
+        background: #fff;
+        color: #000;
+        font-weight: 800;
+        font-size: 0.8rem;
+        line-height: 1;
+      }
+
+      /* 日期（MM/DD）加大加粗 */
+      .cal-date {
+        font-weight: 900;
+        color: inherit;
+        font-size: 1.15rem;
+        letter-spacing: 0.02em;
+      }
+
+      /* ★ 當日菜單：縮小、單行、省略號，不換行 */
+      .cal-menu {
+        font-size: 0.95rem;
+        font-weight: 900;
+        letter-spacing: 0.02em;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+      }
+
+      /* 整格上色 */
+      .day-prep {
+        background: #ef4444 !important;
+        color: #fff !important;
+        border-color: #ef4444 !important;
+      }
+      .day-protein {
+        background: #fff3cd !important;
+        color: #7a5e00 !important;
+        border-color: #ffe69c !important;
+      }
+      .day-slim {
+        background: #22c55e !important;
+        color: #fff !important;
+        border-color: #22c55e !important;
+      }
+      .day-meta {
+        background: #3b82f6 !important;
+        color: #fff !important;
+        border-color: #3b82f6 !important;
+      }
     </style>
   </head>
   <body>
     <div class="container-fluid px-0">
-      <h1 class="h3 mb-3 px-3">高雄博士班-健管45學員清單</h1>
       <!-- ===== 進度地圖區塊 ===== -->
       <div class="board-wrap px-3 mb-3">
+        <h2 class="h5 mb-2">進度地圖</h2>
         <div id="boardGrid" class="board-grid" aria-label="健管 45 天（每週左到右）"></div>
       </div>
+
+      <h1 class="h3 mb-3 px-3">高雄博士班-健管45學員清單</h1>
 
       <!-- 篩選 + 重新讀取 -->
       <div class="row g-2 align-items-center mb-3 px-3">
@@ -311,18 +402,41 @@
       </div>
     </div>
 
+    <!-- ===== Modal：總菜單 45 天日曆 ===== -->
+    <div class="modal fade" id="menuModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title"><span id="modalName"></span> 的 45 天日曆</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="關閉"></button>
+          </div>
+          <div class="modal-body">
+            <div id="modalDateRange" class="mb-2 text-secondary small"></div>
+            <div id="calendarWrap" class="calendar-45"></div>
+            <div id="calendarNote" class="alert alert-warning mt-3 d-none"></div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">關閉</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bootstrap JS（Modal 需要） -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
     <script>
       // ==== 設定 ====
       const API_KEY = "AIzaSyD14dE-5ouFvIxnTrwF3zhHqFhh9OW0q8c";
       const SHEET_ID = "1vFrSu2c0UWTeyKdDcNwuwVUOSKHdRuTZ3PwzcoLyLEo";
-      const SHEET_NAME = "健管學員清單";
+      const SHEET_MAIN = "健管學員清單";
+      const SHEET_MENU = "學員菜單";
 
       const SOURCE_HEADERS = ["狀態", "第幾天", "學員姓名", "專屬教練", "開始日期", "結束日期", "今日菜單"];
-      const DISPLAY_HEADERS = ["狀態", "學員姓名", "天數", "週數", "專屬教練", "執行日期", "今日菜單"];
-      const MOBILE_KEEP = new Set(["狀態", "學員姓名", "天數", "週數", "專屬教練", "今日菜單"]);
+      const DISPLAY_HEADERS = ["狀態", "學員姓名", "天數", "週數", "專屬教練", "執行日期", "今日菜單", "總菜單"];
+      const MOBILE_KEEP = new Set(["狀態", "學員姓名", "天數", "週數", "專屬教練", "今日菜單", "總菜單"]);
       const MAX_DAYS = 45;
 
-      // 地圖顯示哪些狀態（空陣列=全部；只要進行中→改成 ["進行中"]）
       const BOARD_STATUS_WHITELIST = []; // ["進行中"]
 
       // ==== DOM ====
@@ -334,13 +448,23 @@
       const $reload = document.getElementById("reloadBtn");
       const $board = document.getElementById("boardGrid");
 
+      // Modal DOM
+      const $menuModal = document.getElementById("menuModal");
+      const $modalName = document.getElementById("modalName");
+      const $modalDateRange = document.getElementById("modalDateRange");
+      const $calendarWrap = document.getElementById("calendarWrap");
+      const $calendarNote = document.getElementById("calendarNote");
+
       let _rawRows = []; // 關鍵字篩選基底
+      const MENU_BY_NAME = new Map(); // name -> {1:'準備日',...}
+
+      const SPLIT_RE = /[\/／﹨＼]/;
 
       // 初次載入
       buildBoard();
       fetchAndRender();
 
-      // 綁定事件
+      // 事件
       $reload.addEventListener("click", fetchAndRender);
       $filter.addEventListener("input", () => {
         applyFilter();
@@ -352,6 +476,15 @@
       );
       window.addEventListener("load", () => afterLayout(handleResize));
 
+      $menuModal.addEventListener("show.bs.modal", (ev) => {
+        const trigger = ev.relatedTarget;
+        if (!trigger) return;
+        const name = trigger.getAttribute("data-name") || "";
+        const startRaw = trigger.getAttribute("data-start") || "";
+        const endRaw = trigger.getAttribute("data-end") || "";
+        openCalendarFor({ name, startRaw, endRaw });
+      });
+
       function isMobile() {
         return window.matchMedia("(max-width: 576px)").matches;
       }
@@ -359,20 +492,18 @@
         return MOBILE_KEEP.has(headerDisplay) ? "" : "d-none d-sm-table-cell";
       }
 
-      // === 生成 45 天地圖（每週左到右） ===
+      // === 生成 45 天地圖 ===
       function buildBoard() {
         $board.innerHTML = "";
         for (let w = 1; w <= 7; w++) {
           const row = document.createElement("div");
           row.className = "board-row";
 
-          // 週數標籤
           const tag = document.createElement("div");
           tag.className = `week-tag c${w}`;
           tag.textContent = `第${numToZh(w)}週`;
           row.appendChild(tag);
 
-          // 7 天容器（flex）
           const days = document.createElement("div");
           days.className = "days-row";
           for (let c = 1; c <= 7; c++) {
@@ -381,7 +512,7 @@
             cell.className = "board-cell";
             cell.id = `cell-day-${dayAbs}`;
             cell.dataset.day = String(dayAbs);
-            cell.dataset.col = String(c); // 直欄索引 1..7
+            cell.dataset.col = String(c);
             cell.innerHTML = `
               <div class="day-label">${dayAbs}</div>
               <div class="names-full"></div>
@@ -400,19 +531,26 @@
         $thead.innerHTML = DISPLAY_HEADERS.map((h) => `<th scope="col" class="${colClass(h)}">${h}</th>`).join("");
 
         try {
-          const rangeA1 = `${SHEET_NAME}!A:Z`;
-          const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(rangeA1)}?key=${API_KEY}`;
-          const resp = await fetch(url, { method: "GET" });
-          if (!resp.ok) throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
-          const data = await resp.json();
+          // 兩張分頁並行抓取
+          const mainRange = `${SHEET_MAIN}!A:Z`;
+          const menuRange = `${SHEET_MENU}!A:AZ`;
+          const mainUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(mainRange)}?key=${API_KEY}`;
+          const menuUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(menuRange)}?key=${API_KEY}`;
 
-          const values = data.values || [];
+          const [respMain, respMenu] = await Promise.all([fetch(mainUrl), fetch(menuUrl)]);
+          if (!respMain.ok) throw new Error(`主表 HTTP ${respMain.status} ${respMain.statusText}`);
+          if (!respMenu.ok) throw new Error(`菜單表 HTTP ${respMenu.status} ${respMenu.statusText}`);
+
+          const dataMain = await respMain.json();
+          const dataMenu = await respMenu.json();
+
+          // === 主表處理 ===
+          const values = dataMain.values || [];
           if (!values.length) {
             showError("工作表沒有資料。");
             toggleLoading(false);
             return;
           }
-
           const headerRow = values[0].map((v) => (v ?? "").trim());
           const bodyRows = values.slice(1);
 
@@ -422,7 +560,7 @@
           });
 
           const missing = SOURCE_HEADERS.filter((h) => !(h in colIndexByLabel));
-          if (missing.length) showError(`下列表頭在工作表中找不到：${missing.join("、")}。請確認表頭文字一致。`);
+          if (missing.length) showError(`下列表頭在「${SHEET_MAIN}」找不到：${missing.join("、")}。請確認表頭文字一致。`);
 
           const nameIdx = colIndexByLabel["學員姓名"];
           const dayIdx = colIndexByLabel["第幾天"];
@@ -430,9 +568,10 @@
           const endIdx = colIndexByLabel["結束日期"];
           const menuIdx = colIndexByLabel["今日菜單"];
 
-          const SPLIT_RE = /[\/／﹨＼]/;
+          // === 菜單分頁處理 ===
+          buildMenuMap(dataMenu.values || []);
 
-          // === 先做原始記錄（用於排序、地圖） ===
+          // === 原始記錄（排序、地圖） ===
           const records = [];
           for (const row of bodyRows) {
             if (!row || row.every((cell) => String(cell || "").trim() === "")) continue;
@@ -447,7 +586,7 @@
             records.push({ row, statusTxt, isCompleted, startDate });
           }
 
-          // 依規則排序：已完成放最後；其餘依開始日期由早到晚
+          // 排序：已完成放最後；其餘依開始日期由早到晚
           records.sort((a, b) => {
             if (a.isCompleted !== b.isCompleted) return a.isCompleted ? 1 : -1;
             const ta = a.startDate ? a.startDate.getTime() : Number.POSITIVE_INFINITY;
@@ -455,7 +594,7 @@
             return ta - tb;
           });
 
-          // === 產生「表格用」展開資料：學員姓名用斜線分割成多筆 ===
+          // === 表格用：姓名用斜線分割成多筆 ===
           const tableItems = [];
           for (const rec of records) {
             const nameRaw = getCell(rec.row, nameIdx);
@@ -463,19 +602,13 @@
               .split(SPLIT_RE)
               .map((s) => s.trim())
               .filter(Boolean);
-            if (parts.length === 0) continue; // 仍防空
+            if (!parts.length) continue;
             for (const nm of parts) {
-              tableItems.push({
-                row: rec.row,
-                name: nm, // ★ 單一姓名
-                statusTxt: rec.statusTxt,
-                isCompleted: rec.isCompleted,
-                startDate: rec.startDate,
-              });
+              tableItems.push({ row: rec.row, name: nm, statusTxt: rec.statusTxt, isCompleted: rec.isCompleted, startDate: rec.startDate });
             }
           }
 
-          // 表格渲染（使用展開資料）
+          // 表格渲染
           const rowsHtml = [];
           _rawRows = [];
           for (const item of tableItems) {
@@ -511,16 +644,36 @@
                 continue;
               }
 
-              // 對應來源表頭
-              let sourceHeader = headerDisplay;
-              if (headerDisplay === "天數") sourceHeader = "第幾天";
-
               if (headerDisplay === "學員姓名") {
-                tds.push(`<td class="${colClass(headerDisplay)}">${escapeHtml(name)}</td>`); // ★ 使用拆分後姓名
+                tds.push(`<td class="${colClass(headerDisplay)}">${escapeHtml(name)}</td>`);
                 rowTextCollector.push(name);
                 continue;
               }
 
+              if (headerDisplay === "總菜單") {
+                const startTxtRaw = getCell(row, startIdx);
+                const endTxtRaw = getCell(row, endIdx);
+                const btn = `
+                  <button 
+                    type="button" 
+                    class="btn btn-sm btn-outline-primary btn-view-calendar"
+                    data-bs-toggle="modal"
+                    data-bs-target="#menuModal"
+                    data-name="${escapeAttr(name)}"
+                    data-start="${escapeAttr(startTxtRaw)}"
+                    data-end="${escapeAttr(endTxtRaw)}"
+                    title="檢視 45 天菜單"
+                  >
+                    菜單
+                  </button>`;
+                tds.push(`<td class="${colClass(headerDisplay)}">${btn}</td>`);
+                rowTextCollector.push("菜單");
+                continue;
+              }
+
+              // 對應來源表頭
+              let sourceHeader = headerDisplay;
+              if (headerDisplay === "天數") sourceHeader = "第幾天";
               const idx = colIndexByLabel[sourceHeader];
               const txt = getCell(row, idx);
 
@@ -542,10 +695,9 @@
                 const mobile = `<span class="status-dot ${dotBg} d-inline-block d-sm-none" title="${escapeHtml(s)}" aria-label="${escapeHtml(s)}"></span>`;
                 tds.push(`<td class="${colClass(headerDisplay)}">${desktop}${mobile}</td>`);
               } else if (sourceHeader === "今日菜單" && txt) {
-                // 表格徽章（蛋白日改成淡黃色）
                 const mv = menuVisual(txt);
                 if (mv) {
-                  tds.push(`<td class="${colClass(headerDisplay)}"><span class="badge ${mv.badgeClass} badge-menu">${escapeHtml(txt)}</span></td>`);
+                  tds.push(`<td class="${colClass(headerDisplay)}"><span class="badge ${mv.badgeClass} badge-menu">${escapeHtml(mv.full)}</span></td>`);
                 } else {
                   tds.push(`<td class="${colClass(headerDisplay)}">${escapeHtml(txt)}</td>`);
                 }
@@ -561,10 +713,10 @@
           $tbody.innerHTML = rowsHtml.join("");
           applyFilter();
 
-          // 地圖渲染：把名字放到對應天數（支援 /／\＼ 分割多名），並加上餐點圓點
+          // 地圖渲染
           renderBoardNames(records, colIndexByLabel);
 
-          // 完成 DOM 後：做手機姓名/欄寬調整，再設置「全空週的固定高度」
+          // 完成 DOM 後：手機姓名/欄寬調整 + 全空週固定高度
           afterLayout(handleResize);
         } catch (err) {
           showError("讀取失敗：" + (err?.message || err));
@@ -573,7 +725,44 @@
         }
       }
 
-      // 把學員名字放到對應格子（含餐點圓點）
+      // 解析「學員菜單」分頁
+      function buildMenuMap(values) {
+        MENU_BY_NAME.clear();
+        if (!values.length) return;
+
+        const header = values[0].map((v) => (v ?? "").toString().trim());
+        const dayColIdx = {}; // day -> idx
+        for (let i = 1; i < header.length; i++) {
+          const n = Number(header[i]);
+          if (Number.isInteger(n) && n >= 1 && n <= MAX_DAYS) dayColIdx[n] = i;
+        }
+
+        for (let r = 1; r < values.length; r++) {
+          const row = values[r] || [];
+          const nameRaw = (row[0] ?? "").toString().trim();
+          if (!nameRaw) continue;
+
+          const names = nameRaw
+            .split(SPLIT_RE)
+            .map((s) => s.trim())
+            .filter(Boolean);
+          if (!names.length) continue;
+
+          const perDay = {};
+          for (let d = 1; d <= MAX_DAYS; d++) {
+            const idx = dayColIdx[d];
+            if (idx == null) continue;
+            const txt = (row[idx] ?? "").toString().trim();
+            if (txt) perDay[d] = txt;
+          }
+
+          for (const nm of names) {
+            MENU_BY_NAME.set(normalizeName(nm), perDay);
+          }
+        }
+      }
+
+      // 地圖姓名渲染
       function renderBoardNames(records, colIndexByLabel) {
         document.querySelectorAll(".board-cell .names-full").forEach((el) => (el.innerHTML = ""));
 
@@ -581,7 +770,6 @@
         const dayIdx = colIndexByLabel["第幾天"];
         const statusIdx = colIndexByLabel["狀態"];
         const menuIdx = colIndexByLabel["今日菜單"];
-        const SPLIT_RE = /[\/／﹨＼]/;
 
         const dayMap = new Map(); // day -> [{name, mv}]
         for (const rec of records) {
@@ -598,12 +786,10 @@
           if (!Number.isFinite(nDay) || nDay <= 0 || nDay > MAX_DAYS) continue;
 
           const menuTxt = getCell(rec.row, menuIdx);
-          const mv = menuVisual(menuTxt); // 可能為 null
+          const mv = menuVisual(menuTxt);
 
           if (!dayMap.has(nDay)) dayMap.set(nDay, []);
-          for (const p of parts) {
-            dayMap.get(nDay).push({ name: p, mv });
-          }
+          for (const p of parts) dayMap.get(nDay).push({ name: p, mv });
         }
 
         for (let day = 1; day <= MAX_DAYS; day++) {
@@ -617,7 +803,6 @@
             r.className = "name-row";
             r.dataset.fullname = it.name;
 
-            // 餐點圓點（若無法辨識菜單，就不顯示）
             if (it.mv) {
               const dot = document.createElement("span");
               dot.className = `menu-dot ${it.mv.dotClass}`;
@@ -628,7 +813,7 @@
 
             const nt = document.createElement("span");
             nt.className = "name-text";
-            nt.textContent = it.name; // 桌面顯示全名；手機稍後裁成倒數兩字
+            nt.textContent = it.name;
             r.appendChild(nt);
 
             r.title = it.name;
@@ -641,7 +826,7 @@
       function applyMobileNameTransform() {
         const isM = isMobile();
 
-        // 還原全名（避免反覆切換造成裁切累積）
+        // 還原全名
         document.querySelectorAll(".name-row").forEach((r) => {
           const nt = r.querySelector(".name-text");
           const full = r.dataset.fullname || nt?.textContent || "";
@@ -673,7 +858,7 @@
         }
       }
 
-      // ★ 只有整週沒有姓名時，才把該 row 的 7 格設為「與週標籤同高」（以 min-height）
+      // 整週無姓名 → 設定最小高度
       function adjustWeekMinHeights() {
         const rows = Array.from(document.querySelectorAll("#boardGrid .board-row"));
         const mobile = isMobile();
@@ -683,13 +868,11 @@
           const cells = Array.from(row.querySelectorAll(".board-cell"));
           if (!cells.length) return;
 
-          // 清除舊限制
           cells.forEach((cell) => {
             cell.style.height = "";
             cell.style.minHeight = "";
           });
 
-          // 判斷是否完全沒有姓名
           const hasAnyName = cells.some((cell) => cell.querySelector(".name-row"));
           if (!hasAnyName) {
             let tagH = 0;
@@ -709,18 +892,14 @@
         });
       }
 
-      // 計算順序：手機姓名/欄寬 → 最小高度（全空週）
       function handleResize() {
         applyMobileNameTransform();
         adjustWeekMinHeights();
       }
 
-      // 兩次 rAF 之後再執行，確保 DOM/樣式都完成佈局
       function afterLayout(fn) {
         requestAnimationFrame(() => requestAnimationFrame(fn));
       }
-
-      // 工具：防抖
       function debounce(fn, wait) {
         let t;
         return (...args) => {
@@ -742,44 +921,95 @@
         });
       }
 
-      // === 菜單對應：圓點（地圖）與表格徽章 ===
+      // === Modal：45 天日曆 ===
+      function openCalendarFor({ name, startRaw, endRaw }) {
+        $modalName.textContent = name || "";
+        $calendarWrap.innerHTML = "";
+        $calendarNote.classList.add("d-none");
+        $calendarNote.textContent = "";
+        $modalDateRange.textContent = "";
+
+        const start = parseSheetDate(startRaw);
+        const end = parseSheetDate(endRaw);
+
+        if (!start || !end || isNaN(+start) || isNaN(+end) || end < start) {
+          $calendarNote.classList.remove("d-none");
+          $calendarNote.textContent = "無法產生日曆：開始 / 結束日期缺失或格式不正確。";
+          return;
+        }
+
+        $modalDateRange.textContent = `期間：${formatDateDisplay(startRaw)} ～ ${formatDateDisplay(endRaw)}（最多顯示 45 天）`;
+
+        const menus = MENU_BY_NAME.get(normalizeName(name)) || {};
+
+        for (let i = 1; i <= MAX_DAYS; i++) {
+          const d = new Date(start);
+          d.setDate(d.getDate() + (i - 1));
+          const inRange = d >= start && d <= end;
+
+          const cell = document.createElement("div");
+          cell.className = "cal-cell";
+          cell.classList.add(inRange ? "cal-active" : "cal-muted");
+
+          const head = document.createElement("div");
+          head.className = "cal-head";
+
+          const idx = document.createElement("span");
+          idx.className = "cal-idx"; // 無外框、白底、黑字
+          idx.textContent = i;
+
+          const dateStr = document.createElement("span");
+          const mm = String(d.getMonth() + 1).padStart(2, "0");
+          const dd = String(d.getDate()).padStart(2, "0");
+          dateStr.className = "cal-date";
+          dateStr.textContent = `${mm}/${dd}`;
+
+          head.appendChild(idx);
+          head.appendChild(dateStr);
+
+          const menuTextRaw = (menus[i] || "").toString().trim();
+          const mv = menuVisual(menuTextRaw);
+          const menu = document.createElement("div");
+          menu.className = "cal-menu";
+          if (menuTextRaw && inRange) {
+            if (mv) {
+              cell.classList.add(mv.cellClass);
+              menu.textContent = mv.full; // 單行省略
+              menu.title = mv.title;
+            } else {
+              menu.textContent = menuTextRaw;
+            }
+          } else {
+            menu.textContent = "";
+          }
+
+          cell.appendChild(head);
+          cell.appendChild(menu);
+          $calendarWrap.appendChild(cell);
+        }
+
+        const hasAny = Object.keys(menus).length > 0;
+        if (!hasAny) {
+          $calendarNote.classList.remove("d-none");
+          $calendarNote.textContent = "在「學員菜單」分頁找不到此學員的逐日菜單。請確認姓名是否一致。";
+        }
+      }
+
+      // === 菜單對應 ===
       function menuVisual(val) {
-        const s = String(val || "").replace(/\s/g, "");
-        // 準備日
+        const raw = String(val || "").trim();
+        const s = raw.replace(/\s/g, "");
         if (/^(準備日|準)$/i.test(s)) {
-          return {
-            char: "準",
-            dotClass: "dot-prep",
-            badgeClass: "bg-danger text-white",
-            title: "準備日",
-          };
+          return { char: "準", full: "準備日", title: "準備日", dotClass: "dot-prep", badgeClass: "bg-danger text-white", cellClass: "day-prep" };
         }
-        // 蛋白日（淡黃色）
         if (/^(蛋白日|蛋)$/i.test(s)) {
-          return {
-            char: "蛋",
-            dotClass: "dot-protein",
-            badgeClass: "bg-warning-subtle text-dark border border-warning-subtle",
-            title: "蛋白日",
-          };
+          return { char: "蛋", full: "蛋白日", title: "蛋白日", dotClass: "dot-protein", badgeClass: "bg-warning-subtle text-dark border border-warning-subtle", cellClass: "day-protein" };
         }
-        // 纖體日（綠）
         if (/^(纖體日|纖)$/i.test(s)) {
-          return {
-            char: "纖",
-            dotClass: "dot-slim",
-            badgeClass: "bg-success text-white",
-            title: "纖體日",
-          };
+          return { char: "纖", full: "纖體日", title: "纖體日", dotClass: "dot-slim", badgeClass: "bg-success text-white", cellClass: "day-slim" };
         }
-        // 新陳代謝日（藍）
         if (/^(新陳代謝日|新|代)$/i.test(s)) {
-          return {
-            char: "新",
-            dotClass: "dot-meta",
-            badgeClass: "bg-primary text-white",
-            title: "新陳代謝日",
-          };
+          return { char: "新", full: "新陳代謝日", title: "新陳代謝日", dotClass: "dot-meta", badgeClass: "bg-primary text-white", cellClass: "day-meta" };
         }
         return null;
       }
@@ -795,8 +1025,13 @@
       function getCell(row, idx) {
         return Number.isInteger(idx) && row[idx] != null ? String(row[idx]).trim() : "";
       }
+      function normalizeName(s) {
+        return String(s || "")
+          .trim()
+          .replace(/\s+/g, "")
+          .toLowerCase();
+      }
 
-      // 週數渲染（彩虹進度）
       function renderWeekGridResponsive(weekNum) {
         let grid = '<div class="week-grid d-none d-sm-inline-flex" aria-label="週數進度">';
         for (let i = 1; i <= 7; i++) {
@@ -804,16 +1039,13 @@
           grid += `<span class="${cls}" title="第 ${i} 週">${i}</span>`;
         }
         grid += "</div>";
-        let mobile;
-        if (weekNum >= 1 && weekNum <= 7) {
-          mobile = `<span class="week-box c${weekNum} d-inline-flex d-sm-none" title="第 ${weekNum} 週">${weekNum}</span>`;
-        } else {
-          mobile = `<span class="week-box inactive d-inline-flex d-sm-none" title="週數無效">–</span>`;
-        }
+        let mobile =
+          weekNum >= 1 && weekNum <= 7
+            ? `<span class="week-box c${weekNum} d-inline-flex d-sm-none" title="第 ${weekNum} 週">${weekNum}</span>`
+            : `<span class="week-box inactive d-inline-flex d-sm-none" title="週數無效">–</span>`;
         return grid + mobile;
       }
 
-      // 友善日期顯示
       function formatDateDisplay(val) {
         const d = parseSheetDate(val);
         if (!d) return String(val || "").trim();
@@ -823,7 +1055,6 @@
         return `${y}/${m}/${dd}`;
       }
 
-      // 解析日期 / Sheets 序列
       function parseSheetDate(val) {
         if (val == null) return null;
         const s = String(val).trim();
@@ -854,6 +1085,13 @@
       function escapeHtml(str) {
         return String(str).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
       }
+      function escapeAttr(str) {
+        return String(str || "")
+          .replaceAll("&", "&amp;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;");
+      }
       function toggleLoading(show) {
         $loading.classList.toggle("d-none", !show);
       }
@@ -868,4 +1106,3 @@
     </script>
   </body>
 </html>
-
