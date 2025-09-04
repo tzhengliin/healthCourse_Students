@@ -279,11 +279,29 @@
       }
 
       /* ===== Modal 內 45 天日曆 ===== */
+      /* ★ 改成 8 欄：最左一欄放「第幾週」標示，其餘 7 欄為每日 */
       .calendar-45 {
         display: grid;
-        grid-template-columns: repeat(7, 1fr);
+        grid-template-columns: 76px repeat(7, 1fr);
         gap: 6px;
       }
+
+      /* 每列最左側的「第幾週」標示 */
+      .cal-weektag {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 900;
+        color: #000;
+        background: #fff; /* 白底 */
+        border: 1px solid #e5e7eb; /* 淺邊框讓區塊更清楚 */
+        border-radius: 0.5rem;
+        min-height: 84px; /* 與 cal-cell 對齊 */
+        padding: 6px;
+        text-align: center;
+        letter-spacing: 0.02em;
+      }
+
       .cal-cell {
         border: 1px solid var(--bs-border-color, #dee2e6);
         border-radius: 0.5rem;
@@ -524,8 +542,6 @@
           $btnDownloadImage.textContent = "產生中…";
 
           const el = $calendarCapture;
-
-          // 用實際內容尺寸（含 padding）
           const w = Math.ceil(el.scrollWidth);
           const h = Math.ceil(el.scrollHeight);
 
@@ -538,14 +554,14 @@
             windowWidth: Math.max(w, document.documentElement.clientWidth),
             windowHeight: Math.max(h, document.documentElement.clientHeight),
             scrollX: 0,
-            scrollY: -window.scrollY, // 避免頁面捲動影響
+            scrollY: -window.scrollY,
             onclone: (doc) => {
               const cap = doc.getElementById("calendarCapture");
               if (cap) {
                 cap.style.display = "inline-block";
                 cap.style.overflow = "visible";
                 cap.style.background = "#ffffff";
-                cap.style.padding = getComputedStyle($calendarCapture).padding; // 保持相同留白
+                cap.style.padding = getComputedStyle($calendarCapture).padding;
               }
             },
           });
@@ -1015,7 +1031,7 @@
         });
       }
 
-      // === Modal：45 天日曆 ===
+      // === Modal：45 天日曆（含每列最左側週標示） ===
       function openCalendarFor({ name, startRaw, endRaw }) {
         $modalName.textContent = name || "";
         $captureTitle.textContent = `${name || ""} 的健康管理45天計畫`;
@@ -1039,6 +1055,15 @@
         const menus = MENU_BY_NAME.get(normalizeName(name)) || {};
 
         for (let i = 1; i <= MAX_DAYS; i++) {
+          // ★ 每逢新的一週（1,8,15,22,29,36）先插入左側週標示
+          if ((i - 1) % 7 === 0) {
+            const w = Math.floor((i - 1) / 7) + 1; // 1..7
+            const wk = document.createElement("div");
+            wk.className = "cal-weektag";
+            wk.textContent = `第${numToZh(w)}週`;
+            $calendarWrap.appendChild(wk);
+          }
+
           const d = new Date(start);
           d.setDate(d.getDate() + (i - 1));
           const inRange = d >= start && d <= end;
