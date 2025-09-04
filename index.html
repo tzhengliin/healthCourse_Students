@@ -110,7 +110,7 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        font-size: 18px; /* ★ 電腦版固定 18px（手機會覆寫） */
+        font-size: 18px; /* 電腦版固定 18px（手機會覆寫） */
       }
       .name-text {
         display: inline-block;
@@ -336,7 +336,7 @@
         letter-spacing: 0.02em;
       }
 
-      /* ★ 當日菜單：縮小、單行、省略號，不換行 */
+      /* 當日菜單：縮小、單行、省略號，不換行 */
       .cal-menu {
         font-size: 0.95rem;
         font-weight: 900;
@@ -367,6 +367,27 @@
         background: #3b82f6 !important;
         color: #fff !important;
         border-color: #3b82f6 !important;
+      }
+
+      /* === 截圖區塊（加白底與留白邊界） === */
+      .capture-frame {
+        background: #ffffff;
+        padding: 28px; /* 留白 */
+        border-radius: 8px;
+        box-sizing: border-box;
+        display: inline-block; /* 讓寬度跟內容走，避免被容器壓縮 */
+        overflow: visible; /* 確保不裁切 */
+      }
+      .capture-title {
+        font-weight: 900;
+        text-align: center;
+        font-size: 1.2rem;
+        letter-spacing: 0.02em;
+        margin-bottom: 6px;
+        color: #000;
+      }
+      .capture-sub {
+        text-align: center;
       }
     </style>
   </head>
@@ -404,18 +425,24 @@
 
     <!-- ===== Modal：總菜單 45 天日曆 ===== -->
     <div class="modal fade" id="menuModal" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+      <!-- 更大的 modal-xl；小螢幕全螢幕 -->
+      <div class="modal-dialog modal-xl modal-fullscreen-sm-down modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
           <div class="modal-header">
             <h5 class="modal-title"><span id="modalName"></span> 的 45 天日曆</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="關閉"></button>
           </div>
           <div class="modal-body">
-            <div id="modalDateRange" class="mb-2 text-secondary small"></div>
-            <div id="calendarWrap" class="calendar-45"></div>
+            <!-- ★ 下載截圖的擷取區（標題 + 期間 + 日曆） -->
+            <div id="calendarCapture" class="capture-frame">
+              <h4 id="captureTitle" class="capture-title"></h4>
+              <div id="modalDateRange" class="mb-2 text-secondary small capture-sub"></div>
+              <div id="calendarWrap" class="calendar-45"></div>
+            </div>
             <div id="calendarNote" class="alert alert-warning mt-3 d-none"></div>
           </div>
           <div class="modal-footer">
+            <button type="button" class="btn btn-outline-primary" id="btnDownloadImage" disabled>下載圖片</button>
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">關閉</button>
           </div>
         </div>
@@ -424,6 +451,8 @@
 
     <!-- Bootstrap JS（Modal 需要） -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- 用於把 DOM 截成圖片 -->
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
     <script>
       // ==== 設定 ====
@@ -451,9 +480,12 @@
       // Modal DOM
       const $menuModal = document.getElementById("menuModal");
       const $modalName = document.getElementById("modalName");
+      const $captureTitle = document.getElementById("captureTitle");
       const $modalDateRange = document.getElementById("modalDateRange");
       const $calendarWrap = document.getElementById("calendarWrap");
       const $calendarNote = document.getElementById("calendarNote");
+      const $calendarCapture = document.getElementById("calendarCapture");
+      const $btnDownloadImage = document.getElementById("btnDownloadImage");
 
       let _rawRows = []; // 關鍵字篩選基底
       const MENU_BY_NAME = new Map(); // name -> {1:'準備日',...}
@@ -476,6 +508,7 @@
       );
       window.addEventListener("load", () => afterLayout(handleResize));
 
+      // Modal：攔截顯示事件，建立日曆並啟用下載鍵
       $menuModal.addEventListener("show.bs.modal", (ev) => {
         const trigger = ev.relatedTarget;
         if (!trigger) return;
@@ -484,6 +517,71 @@
         const endRaw = trigger.getAttribute("data-end") || "";
         openCalendarFor({ name, startRaw, endRaw });
       });
+
+      // 下載：把 calendarCapture 區域轉成 PNG（使用 scrollWidth/scrollHeight，避免右側被裁）
+      $btnDownloadImage.addEventListener("click", async () => {
+        try {
+          $btnDownloadImage.disabled = true;
+          $btnDownloadImage.textContent = "產生中…";
+
+          const el = $calendarCapture;
+
+          // 用實際內容尺寸（含 padding）
+          const w = Math.ceil(el.scrollWidth);
+          const h = Math.ceil(el.scrollHeight);
+
+          const canvas = await html2canvas(el, {
+            backgroundColor: "#ffffff",
+            useCORS: true,
+            scale: Math.min(2, window.devicePixelRatio || 1.5),
+            width: w,
+            height: h,
+            windowWidth: Math.max(w, document.documentElement.clientWidth),
+            windowHeight: Math.max(h, document.documentElement.clientHeight),
+            scrollX: 0,
+            scrollY: -window.scrollY, // 避免頁面捲動影響
+            onclone: (doc) => {
+              const cap = doc.getElementById("calendarCapture");
+              if (cap) {
+                cap.style.display = "inline-block";
+                cap.style.overflow = "visible";
+                cap.style.background = "#ffffff";
+                cap.style.padding = getComputedStyle($calendarCapture).padding; // 保持相同留白
+              }
+            },
+          });
+
+          canvas.toBlob((blob) => {
+            if (!blob) return;
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = buildDownloadFilename();
+            document.body.appendChild(a);
+            a.click();
+            URL.revokeObjectURL(a.href);
+            a.remove();
+          }, "image/png");
+        } catch (e) {
+          alert("下載失敗，請再試一次。");
+          console.error(e);
+        } finally {
+          $btnDownloadImage.textContent = "下載圖片";
+          $btnDownloadImage.disabled = false;
+        }
+      });
+
+      function buildDownloadFilename() {
+        const name = ($modalName.textContent || "學員").replace(/\s+/g, "");
+        const range = ($modalDateRange.textContent || "")
+          .replace(/[^0-9\-\/～]/g, "")
+          .replaceAll("/", "")
+          .replace("期間：", "")
+          .replace("（最多顯示 45 天）", "")
+          .replace(/\s+/g, "");
+        const m = range.match(/(\d{4}\d{2}\d{2}).*?(\d{4}\d{2}\d{2})/);
+        const span = m ? `${m[1]}-${m[2]}` : "期間";
+        return `菜單_${name}_${span}.png`;
+      }
 
       function isMobile() {
         return window.matchMedia("(max-width: 576px)").matches;
@@ -663,9 +761,7 @@
                     data-start="${escapeAttr(startTxtRaw)}"
                     data-end="${escapeAttr(endTxtRaw)}"
                     title="檢視 45 天菜單"
-                  >
-                    菜單
-                  </button>`;
+                  >菜單</button>`;
                 tds.push(`<td class="${colClass(headerDisplay)}">${btn}</td>`);
                 rowTextCollector.push("菜單");
                 continue;
@@ -896,7 +992,6 @@
         applyMobileNameTransform();
         adjustWeekMinHeights();
       }
-
       function afterLayout(fn) {
         requestAnimationFrame(() => requestAnimationFrame(fn));
       }
@@ -924,10 +1019,12 @@
       // === Modal：45 天日曆 ===
       function openCalendarFor({ name, startRaw, endRaw }) {
         $modalName.textContent = name || "";
+        $captureTitle.textContent = `${name || ""} 的健康管理45天計畫`;
         $calendarWrap.innerHTML = "";
         $calendarNote.classList.add("d-none");
         $calendarNote.textContent = "";
         $modalDateRange.textContent = "";
+        $btnDownloadImage.disabled = true; // 重設
 
         const start = parseSheetDate(startRaw);
         const end = parseSheetDate(endRaw);
@@ -955,7 +1052,7 @@
           head.className = "cal-head";
 
           const idx = document.createElement("span");
-          idx.className = "cal-idx"; // 無外框、白底、黑字
+          idx.className = "cal-idx";
           idx.textContent = i;
 
           const dateStr = document.createElement("span");
@@ -974,7 +1071,7 @@
           if (menuTextRaw && inRange) {
             if (mv) {
               cell.classList.add(mv.cellClass);
-              menu.textContent = mv.full; // 單行省略
+              menu.textContent = mv.full;
               menu.title = mv.title;
             } else {
               menu.textContent = menuTextRaw;
@@ -993,6 +1090,10 @@
           $calendarNote.classList.remove("d-none");
           $calendarNote.textContent = "在「學員菜單」分頁找不到此學員的逐日菜單。請確認姓名是否一致。";
         }
+
+        requestAnimationFrame(() => {
+          $btnDownloadImage.disabled = false;
+        });
       }
 
       // === 菜單對應 ===
@@ -1102,6 +1203,21 @@
       function clearError() {
         $error.textContent = "";
         $error.classList.add("d-none");
+      }
+
+      function handleResize() {
+        applyMobileNameTransform();
+        adjustWeekMinHeights();
+      }
+      function afterLayout(fn) {
+        requestAnimationFrame(() => requestAnimationFrame(fn));
+      }
+      function debounce(fn, wait) {
+        let t;
+        return (...args) => {
+          clearTimeout(t);
+          t = setTimeout(() => fn.apply(null, args), wait);
+        };
       }
     </script>
   </body>
