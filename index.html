@@ -407,6 +407,12 @@
       .capture-sub {
         text-align: center;
       }
+      /* 隱藏但保留版位（不影響寬度分配與排版） */
+      .board-cell.is-ghost {
+        visibility: hidden;     /* 看不到 */
+        pointer-events: none;   /* 不可互動 */
+      }
+
     </style>
   </head>
   <body>
@@ -605,8 +611,7 @@
         return MOBILE_KEEP.has(headerDisplay) ? "" : "d-none d-sm-table-cell";
       }
 
-      // === 生成 45 天地圖 ===
-      // === 生成 45 天地圖（第 7 週只顯示 43、44、45 三天）===
+      // === 生成 45 天地圖：第 7 週仍建立 7 欄，但第 46~49 天做「隱藏」===
       function buildBoard() {
         $board.innerHTML = "";
         for (let w = 1; w <= 7; w++) {
@@ -621,20 +626,23 @@
           const days = document.createElement("div");
           days.className = "days-row";
       
-          // 前 1~6 週顯示 7 天；第 7 週只顯示 3 天（43,44,45）
-          const colCount = (w === 7) ? 3 : 7;
+          // 每週仍固定建立 7 欄；第 7 週的第 4~7 欄做 ghost（46~49 天）
+          for (let c = 1; c <= 7; c++) {
+            const dayAbs = (w - 1) * 7 + c; // 1..49（第 7 週會到 49）
+            const isGhost = (w === 7 && c >= 4); // 只隱藏 46~49
       
-          for (let c = 1; c <= colCount; c++) {
-            const dayAbs = (w - 1) * 7 + c; // 1..45
             const cell = document.createElement("div");
-            cell.className = "board-cell";
-            cell.id = `cell-day-${dayAbs}`;
-            cell.dataset.day = String(dayAbs);
+            cell.className = "board-cell" + (isGhost ? " is-ghost" : "");
+            // 避免與 1..45 的實際格子混淆，ghost 不用正式 id
+            cell.id = isGhost ? `ghost-day-${dayAbs}` : `cell-day-${dayAbs}`;
             cell.dataset.col = String(c);
+      
+            // 內容：ghost 也建立，但因 visibility:hidden 不會看到
             cell.innerHTML = `
               <div class="day-label">${dayAbs}</div>
               <div class="names-full"></div>
             `;
+      
             days.appendChild(cell);
           }
       
@@ -642,6 +650,7 @@
           $board.appendChild(row);
         }
       }
+
 
 
       async function fetchAndRender() {
@@ -1253,4 +1262,5 @@
     </script>
   </body>
 </html>
+
 
