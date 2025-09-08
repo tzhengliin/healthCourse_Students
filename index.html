@@ -606,21 +606,26 @@
       }
 
       // === 生成 45 天地圖 ===
+      // === 生成 45 天地圖（第 7 週只顯示 43、44、45 三天）===
       function buildBoard() {
         $board.innerHTML = "";
         for (let w = 1; w <= 7; w++) {
           const row = document.createElement("div");
           row.className = "board-row";
-
+      
           const tag = document.createElement("div");
           tag.className = `week-tag c${w}`;
           tag.textContent = `第${numToZh(w)}週`;
           row.appendChild(tag);
-
+      
           const days = document.createElement("div");
           days.className = "days-row";
-          for (let c = 1; c <= 7; c++) {
-            const dayAbs = (w - 1) * 7 + c;
+      
+          // 前 1~6 週顯示 7 天；第 7 週只顯示 3 天（43,44,45）
+          const colCount = (w === 7) ? 3 : 7;
+      
+          for (let c = 1; c <= colCount; c++) {
+            const dayAbs = (w - 1) * 7 + c; // 1..45
             const cell = document.createElement("div");
             cell.className = "board-cell";
             cell.id = `cell-day-${dayAbs}`;
@@ -632,10 +637,12 @@
             `;
             days.appendChild(cell);
           }
+      
           row.appendChild(days);
           $board.appendChild(row);
         }
       }
+
 
       async function fetchAndRender() {
         toggleLoading(true);
@@ -1246,3 +1253,4 @@
     </script>
   </body>
 </html>
+
